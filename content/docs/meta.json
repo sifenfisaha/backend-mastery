@@ -1,0 +1,23 @@
+{
+  "title": "Backend Mastery",
+  "root": true,
+  "pages": [
+    "index",
+    "how-to-use",
+    "roadmap",
+    "---Foundations---",
+    "foundations",
+    "---Data Layer---",
+    "data",
+    "---Architecture---",
+    "architecture",
+    "---Messaging---",
+    "messaging",
+    "---Platform & Ops---",
+    "platform",
+    "---Quality---",
+    "quality",
+    "---Ship It---",
+    "capstones"
+  ]
+}

@@ -1,0 +1,186 @@
+---
+title: Redis
+description: Master in-memory data structures for caching, rate limiting, sessions, locks and pub/sub.
+icon: Zap
+---
+
+## Why this matters
+
+Postgres is where your data *lives*; Redis is where your data goes to be *fast*. It keeps everything
+in RAM, speaks a tiny command protocol, and answers most operations in microseconds — orders of
+magnitude faster than a disk-backed database. But Redis is more than a cache: it's a toolbox of
+purpose-built data structures. Once you stop thinking "key-value store" and start thinking "a server
+with atomic counters, sorted sets, queues, and pub/sub built in," you'll reach for it to solve
+problems — rate limiting, leaderboards, sessions, distributed locks — that would be awkward and slow
+anywhere else. Every serious backend has a Redis in it.
+
+<MentorNote>
+Don't confuse Redis-as-a-cache with Redis-as-your-database. Redis is an *in-memory* store: fast
+because your whole dataset fits in RAM, and durable only to the extent you configure persistence. It
+is a phenomenal accelerator and coordination layer, and a risky choice as the single source of truth
+for data you can't afford to lose. Keep your system of record in Postgres; let Redis make it fast.
+</MentorNote>
+
+## Mental model
+
+Think of Redis as a whiteboard next to your database:
+
+- It's on the desk, not in the filing cabinet — reading from it is instant, but wipe the board and
+  it's gone unless you've been copying to the cabinet (persistence).
+- It has **specialized pens**: a counter you can bump atomically, a ranked list that stays sorted, a
+  queue, a set that dedupes for you. You don't rebuild these each time — Redis ships them.
+- Everything is **single-threaded**, so each command runs to completion with no one else touching
+  the board mid-write. That's why `INCR` is atomic and why you rarely need locks *inside* Redis.
+- It's small and fast on purpose. Put hot, ephemeral, or coordination data on the whiteboard. Keep
+  the authoritative records in the cabinet.
+
+## Core concepts to master
+
+<Accordions type="single">
+<Accordion title="Core data types">
+Redis is a data-structure server, not just strings. **Strings** (also used for counters and raw
+bytes), **hashes** (field-value maps — great for objects/sessions), **lists** (linked lists — queues
+and stacks via `LPUSH`/`RPOP`), **sets** (unique members, set math), **sorted sets** (members ranked
+by a score — the leaderboard workhorse), and **streams** (append-only logs with consumer groups, a
+lightweight Kafka-lite). Choosing the right type *is* the design.
+</Accordion>
+<Accordion title="TTL & expiry">
+Any key can have a time-to-live. `EXPIRE key 60` or `SET key val EX 60` makes it self-destruct — the
+foundation of caching and rate limiting. Redis expires keys lazily (on access) and via a background
+sampler, so expiry is prompt but not exact-to-the-millisecond. `TTL key` tells you the remaining
+seconds. Set a TTL on cache entries so stale data eventually clears itself.
+</Accordion>
+<Accordion title="Persistence: RDB vs AOF">
+Redis lives in RAM but can persist to disk two ways. **RDB** takes point-in-time snapshots — compact,
+fast to restore, but you lose everything since the last snapshot on a crash. **AOF** (append-only
+file) logs every write, so it's far more durable, at the cost of a bigger file and slower restarts.
+Production often runs *both*. If losing a few minutes of data is unacceptable, Redis alone probably
+isn't your system of record.
+</Accordion>
+<Accordion title="Single-threaded model & atomicity">
+Redis executes commands on a single thread, one at a time. That sounds slow but it's blazing — no
+lock contention, no context-switch overhead, and every single command is atomic by definition. This
+is *why* `INCR`, `LPUSH`, and `ZADD` are safe under concurrency without you doing anything. The flip
+side: one slow command (a giant `KEYS *`, a big `SORT`) blocks *everyone*. Keep commands cheap.
+</Accordion>
+<Accordion title="Eviction policies">
+When Redis hits `maxmemory`, its eviction policy decides what to drop. `noeviction` (the default)
+rejects writes — dangerous for a cache. For caching, use `allkeys-lru` (evict least-recently-used) or
+`allkeys-lfu` (least-frequently-used). `volatile-*` variants only evict keys that have a TTL. Pick a
+policy deliberately; the default surprises people in production.
+</Accordion>
+<Accordion title="Pub/sub & when NOT to use Redis as primary DB">
+`PUBLISH`/`SUBSCRIBE` gives you fire-and-forget messaging — great for real-time fan-out (chat,
+notifications), but messages aren't stored, so an offline subscriber misses them (use Streams if you
+need durability). And the big one: don't make Redis your primary database for critical data. It's
+memory-bound (dataset must fit in RAM), persistence is best-effort, and complex queries aren't its
+strength. It's an accelerator and coordinator, not a system of record.
+</Accordion>
+</Accordions>
+
+## 📺 Watch
+
+<VideoGrid>
+  <VideoCard id="G1rOthIU-uo" title="Redis in 100 Seconds" channel="Fireship" duration="2 min" />
+  <VideoCard id="jgpVdJB2sKQ" title="Redis Crash Course" channel="Web Dev Simplified" duration="28 min" />
+  <VideoCard id="XCsS_NVAa1g" title="Redis Course – In-Memory Database Tutorial" channel="freeCodeCamp" duration="46 min" />
+  <VideoCard id="OqCK95AS-YE" title="Redis Crash Course (primary DB)" channel="TechWorld with Nana" duration="50 min" />
+</VideoGrid>
+
+<MentorNote title="What to actually watch">
+Start with Fireship for the 2-minute mental model, then do Web Dev Simplified's crash course — it's
+the fastest path to being productive. The freeCodeCamp and Nana courses are good depth if you want
+it, but pick **one**. You'll learn more from wiring up the rate limiter and leaderboard below than
+from a fourth video.
+</MentorNote>
+
+## 📚 Read
+
+<ResourceGrid>
+  <Resource type="doc" title="Redis Data Types" href="https://redis.io/docs/latest/develop/data-types/" desc="The official reference for every structure — read this to pick the right type." />
+  <Resource type="doc" title="Redis Tutorials" href="https://redis.io/tutorials/" desc="Official hands-on walkthroughs for common patterns." />
+  <Resource type="book" title="The Little Redis Book" href="https://www.openmymind.net/redis.pdf" desc="A short, free, well-written intro to Redis fundamentals." />
+  <Resource type="article" title="How to Learn Redis" href="https://www.freecodecamp.org/news/how-to-learn-redis/" desc="freeCodeCamp's practical primer on Redis basics." />
+  <Resource type="lab" title="Redis University" href="https://university.redis.io/" desc="Free, structured courses straight from the Redis team." />
+</ResourceGrid>
+
+## 🔨 Build this
+
+<Steps>
+<Step>
+**Fixed-window rate limiter.** Implement a per-user limiter using `INCR` + `EXPIRE`. On each request,
+`INCR ratelimit:<userId>`; if the returned value is `1`, set `EXPIRE ratelimit:<userId> 60`. Reject
+the request when the counter exceeds your limit (say, 100/min). Hammer it with a loop and watch it
+block, then reset after the window.
+</Step>
+<Step>
+**Leaderboard with sorted sets.** Use a sorted set: `ZADD leaderboard <score> <player>` to record
+scores, `ZREVRANGE leaderboard 0 9 WITHSCORES` for the top 10, and `ZREVRANK leaderboard <player>`
+for a single player's rank. Add a few hundred players and confirm ranking stays correct as scores
+change — no re-sorting on your side.
+</Step>
+<Step>
+**Cache in front of a slow call.** Wrap a slow function (a heavy query or an external API) in the
+**cache-aside** pattern: check Redis first; on a miss, compute the value, `SET key val EX 300`, then
+return it. Measure latency on the cold call vs. the warm one. You should see microseconds instead of
+milliseconds on cache hits.
+</Step>
+<Step>
+**Add a distributed lock.** Use `SET lock:<resource> <token> NX EX 10` to acquire a lock only if it
+doesn't exist, with a safety TTL. Release it by deleting the key *only if the token matches* (so you
+never delete someone else's lock). Run two workers competing for the same resource and confirm only
+one wins.
+</Step>
+</Steps>
+
+## Cheat sheet
+
+```bash
+redis-cli PING                          # health check -> PONG
+SET user:1 "alice" EX 300               # set with a 300s TTL
+GET user:1                              # read it back
+TTL user:1                              # seconds left before expiry
+INCR pageviews                          # atomic counter (rate limiting)
+EXPIRE ratelimit:42 60                  # window a counter to 60s
+HSET session:abc user 1 role admin      # hash: store an object/session
+HGETALL session:abc                     # read all fields
+LPUSH queue job1 ; RPOP queue           # list as a FIFO queue
+SADD tags redis cache ; SMEMBERS tags   # set: unique members
+ZADD board 100 alice ; ZREVRANGE board 0 9 WITHSCORES  # leaderboard
+SET lock:res tok NX EX 10               # acquire a distributed lock
+SUBSCRIBE news ; PUBLISH news "hello"   # pub/sub
+CONFIG SET maxmemory-policy allkeys-lru # eviction policy for a cache
+```
+
+## Interview signals & common pitfalls
+
+- **Signal of mastery:** you pick the *data structure* to fit the problem — sorted set for a
+  leaderboard, `INCR`+`EXPIRE` for a rate limiter — and you can explain why Redis's single-threaded
+  model makes those operations atomic for free.
+- **Pitfall:** running `KEYS *` in production. It's O(n) and blocks the single thread — use `SCAN`
+  for iteration instead.
+- **Pitfall:** treating Redis as your primary database and being shocked when a crash loses data. Set
+  a system of record; configure persistence deliberately.
+- **Pitfall:** caching without a TTL, so stale data lingers forever and memory fills up. Always expire
+  cache entries.
+- **Pitfall:** leaving `maxmemory-policy` at `noeviction` on a cache — writes start failing when it
+  fills instead of evicting cold keys.
+
+## Mastery checklist
+
+<Checklist id="redis">
+  <Check>I can name the core data types and pick the right one for a given problem.</Check>
+  <Check>I can implement a rate limiter with `INCR` and `EXPIRE`.</Check>
+  <Check>I can build a leaderboard with sorted sets and query ranks.</Check>
+  <Check>I can apply the cache-aside pattern with TTLs in front of a slow call.</Check>
+  <Check>I understand why Redis is single-threaded and why that makes commands atomic.</Check>
+  <Check>I can explain RDB vs AOF and choose an eviction policy for a cache.</Check>
+  <Check>I know when NOT to use Redis as a primary database.</Check>
+  <Check>I can implement a safe distributed lock with `SET NX EX` and a matching token.</Check>
+</Checklist>
+
+<Callout type="info">
+Next up in the roadmap: [Caching](/docs/data/caching) — now that you can wield Redis, learn the
+patterns and pitfalls of caching as a discipline: invalidation, cache-aside vs. write-through, and
+avoiding the thundering herd.
+</Callout>

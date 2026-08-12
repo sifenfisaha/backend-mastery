@@ -1,0 +1,80 @@
+---
+title: Capstone Projects
+description: Portfolio-grade systems that tie every topic together — the kind you can defend end-to-end in a senior interview.
+icon: Trophy
+---
+
+Topics in isolation get you through a quiz. **Systems that combine them** get you the senior offer.
+Each capstone below deliberately forces you to use most of the 17 topics at once. Pick one, build it
+for real, and write it up.
+
+<MentorNote>
+The write-up matters as much as the code. For each capstone, keep a short architecture doc: the
+requirements, your design decisions, the trade-offs you rejected, and what you'd change at 100×
+scale. That document *is* your senior interview.
+</MentorNote>
+
+## Capstone A — "Chirp": a scalable event-driven mini-Twitter
+
+The classic. Small enough to finish, deep enough to touch everything.
+
+<Steps>
+<Step>**Core API** — a containerized service (Docker) with PostgreSQL for users/posts and Redis for the timeline cache.</Step>
+<Step>**Fan-out on write** — when a user posts, publish an event to a queue (Kafka/RabbitMQ); consumers update followers' timelines asynchronously.</Step>
+<Step>**Scale it** — put the API behind a load balancer, run multiple instances, add read replicas and a caching layer.</Step>
+<Step>**Operate it** — deploy to Kubernetes, wire a CI/CD pipeline, and add metrics/traces/dashboards + an alert.</Step>
+<Step>**Harden it** — auth (JWT/OAuth), rate limiting with Redis, OWASP Top 10 pass, and a real test pyramid.</Step>
+</Steps>
+
+**Topics exercised:** Docker · PostgreSQL · Redis · Caching · Queues & EDA · Kafka/RabbitMQ · Load
+Balancing · Scalability · Kubernetes · CI/CD · Observability · Security · Testing.
+
+## Capstone B — "PayFlow": a reliable payments/orders pipeline
+
+If you want to go deep on correctness and reliability instead of scale.
+
+<Steps>
+<Step>**Order service** — accepts orders, writes to Postgres inside a transaction, emits `OrderPlaced`.</Step>
+<Step>**Saga** — payment, inventory, and shipping services react to events; implement compensating actions for failures.</Step>
+<Step>**Exactly-once-ish** — idempotency keys, a dead-letter queue, and retries with backoff so no order is lost or double-charged.</Step>
+<Step>**Resilience** — circuit breakers around external calls; chaos-test by killing services mid-flow.</Step>
+<Step>**Observe & prove** — distributed tracing across the whole saga, plus a load test showing your SLOs hold.</Step>
+</Steps>
+
+**Topics exercised:** Distributed Systems · Microservices · Queues & EDA · Kafka/RabbitMQ ·
+Reliability & Fault Tolerance · Observability · Testing · Security.
+
+## Capstone C — "Watchtower": a self-hosted observability stack
+
+For the ops-minded. Build the thing that watches everything else.
+
+<Steps>
+<Step>**Instrument** a sample app with OpenTelemetry (traces + metrics).</Step>
+<Step>**Collect** with Prometheus; visualize in Grafana; centralize logs.</Step>
+<Step>**Alert** on real SLOs (latency, error rate) via Alertmanager.</Step>
+<Step>**Automate** the whole stack with Docker Compose *and* Kubernetes manifests + CI.</Step>
+<Step>**Load-test** the app and watch your dashboards tell the story of the failure.</Step>
+</Steps>
+
+**Topics exercised:** Observability · Kubernetes · Docker · CI/CD · Load Balancing · Scalability ·
+Linux & Networking.
+
+## How to present a capstone
+
+<Tabs items={["README", "Diagram", "Demo"]}>
+<Tab value="README">
+A crisp README: what it does, the architecture, how to run it in one command, and a "scaling &
+trade-offs" section. Recruiters and staff engineers read this first.
+</Tab>
+<Tab value="Diagram">
+One clear architecture diagram (Excalidraw or draw.io). If you can't draw it, you can't explain it.
+</Tab>
+<Tab value="Demo">
+A 3-minute Loom walking through a request end-to-end — including one deliberate failure and how the
+system recovers. This is what makes interviewers remember you.
+</Tab>
+</Tabs>
+
+<Callout type="info">
+Don't build all three. Build **one**, all the way, and make it genuinely good. Depth is the signal.
+</Callout>

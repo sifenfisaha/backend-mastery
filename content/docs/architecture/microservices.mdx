@@ -1,0 +1,173 @@
+---
+title: Microservices
+description: Service boundaries, communication, data ownership — and the honest case for staying a monolith.
+icon: Blocks
+---
+
+## Why this matters
+
+Microservices are the most over-prescribed medicine in backend engineering. Split a system into
+independently deployable services and you *can* get faster teams, isolated failures, and
+targeted scaling. Get the boundaries wrong and you've bought yourself a distributed monolith:
+all the network latency, partial failures, and operational overhead of a distributed system with
+none of the independence. A senior engineer isn't the one who reaches for microservices — it's
+the one who can explain *when the split pays for itself* and, just as often, argues to stay a
+monolith. This topic is about earning the right to distribute.
+
+<MentorNote>
+Don't confuse "microservices" with "scalability." A well-built monolith scales horizontally just
+fine — run more copies behind a load balancer. Microservices don't buy you throughput; they buy
+you **independent deployability** and **team autonomy**. If you can't name the team boundary or
+release cadence a split unlocks, you're paying the distributed-systems tax for nothing.
+</MentorNote>
+
+## Mental model
+
+Think of a company org chart:
+
+- A **monolith** is one big open-plan room — everyone shares the same codebase, database, and
+  deploy. Fast to build, easy to reason about, but everyone steps on each other as it grows.
+- A **microservice** is a small autonomous team with its own office, its own filing cabinet
+  (database), and its own door to the outside (API). It ships on its own schedule.
+- The **service boundary** is where one team's responsibility ends and another's begins — draw it
+  along business capabilities (Orders, Payments, Inventory), not technical layers.
+- **Communication** between teams is either a phone call (synchronous — you wait for the answer)
+  or a memo dropped in an inbox (asynchronous — fire and forget, they process it later).
+
+Conway's Law is the punchline: your architecture will end up mirroring your org chart whether you
+plan for it or not. Design the boundaries deliberately, or your reporting structure will design
+them for you.
+
+## Core concepts to master
+
+<Accordions type="single">
+<Accordion title="Monolith first — and the honest trade-offs">
+Martin Fowler's advice is blunt: **almost all successful microservice stories started as a
+monolith that got too big**. A monolith gives you one deploy, one database, in-process calls (no
+network), and trivial transactions. You trade that for independent deployability and team
+autonomy only when the monolith's coupling actually hurts. Split too early and you're guessing at
+boundaries you don't understand yet — and boundaries are expensive to move once services own
+their data.
+</Accordion>
+<Accordion title="Boundaries via DDD & bounded contexts">
+The hardest part isn't the plumbing — it's *where to cut*. Use Domain-Driven Design: a **bounded
+context** is a slice of the business with its own consistent model and language ("customer" in
+Billing means something different than in Support). Align each service to one bounded context and
+one business capability. Boundaries drawn along business domains stay stable; boundaries drawn
+along technical layers (a "database service", a "logic service") create chatty, coupled messes.
+</Accordion>
+<Accordion title="Communication: sync (REST/gRPC) vs async (events)">
+**Synchronous** (REST over HTTP, or gRPC for low-latency internal calls): the caller blocks and
+waits. Simple to reason about, but it couples availability — if the callee is down, you're down,
+and long call chains multiply latency. **Asynchronous** (publish events to a broker): the sender
+doesn't wait, services stay decoupled and resilient, but you inherit eventual consistency and
+harder debugging. Prefer async events for cross-service workflows; use sync only when you truly
+need an immediate answer.
+</Accordion>
+<Accordion title="Data ownership: database-per-service">
+The defining rule of microservices: **each service owns its own database, and no other service
+touches it directly**. Want another service's data? Ask via its API or subscribe to its events.
+The **shared-database anti-pattern** — multiple services reading and writing the same tables —
+feels convenient but recouples everything: you can't change a schema without coordinating deploys,
+and you've rebuilt the monolith with extra network hops. Own your data or don't split.
+</Accordion>
+<Accordion title="API gateway & service discovery">
+Clients shouldn't know about 30 internal services. An **API gateway** is the single front door:
+it routes requests, handles auth, rate limiting, and TLS termination, and can aggregate calls.
+Internally, services find each other via **service discovery** (a registry like Consul, or
+platform DNS in Kubernetes) instead of hardcoded IPs — instances come and go, and discovery keeps
+the addresses current.
+</Accordion>
+<Accordion title="Distributed transactions & the saga pattern">
+You can't do a two-phase commit across five databases in practice. When a business operation spans
+services (place order → charge card → reserve stock), use a **saga**: a sequence of local
+transactions, each publishing an event that triggers the next. If a step fails, run
+**compensating** transactions to undo the earlier ones (refund the card, release the stock).
+You give up atomicity for availability — the system is eventually consistent, not instantly
+consistent.
+</Accordion>
+</Accordions>
+
+## 📺 Watch
+
+<VideoGrid>
+  <VideoCard id="rv4LlmLmVWk" title="Microservices explained — the What, Why and How" channel="TechWorld with Nana" duration="18 min" />
+  <VideoCard id="lL_j7ilk7rc" title="Microservices Explained in 5 Minutes" channel="TechWorld with Nana" duration="5 min" />
+  <VideoCard id="qYhRvH9tJKw" title="What is a Microservice Architecture and Why?" channel="Gaurav Sen" duration="8 min" />
+  <VideoCard id="hmkF77F9TLw" title="Microservice Architecture Full Course (Python + K8s)" channel="freeCodeCamp" duration="5 hr" />
+</VideoGrid>
+
+<MentorNote title="What to actually watch">
+Start with Nana's 5-minute explainer for the shape, then her 18-minute deep dive for the *why*.
+Gaurav Sen adds the trade-offs and boundary reasoning that separate seniors from juniors. Save the
+5-hour freeCodeCamp course for when you're actually building the lab — don't binge it up front.
+</MentorNote>
+
+## 📚 Read
+
+<ResourceGrid>
+  <Resource type="article" title="Microservices — Martin Fowler" href="https://martinfowler.com/articles/microservices.html" desc="The canonical definition, plus the honest 'monolith first' argument." />
+  <Resource type="doc" title="microservices.io Pattern Language" href="https://microservices.io/patterns/" desc="Chris Richardson's catalog: saga, API gateway, database-per-service, and more." />
+  <Resource type="article" title="What Are Microservices? — AWS" href="https://aws.amazon.com/microservices/" desc="A clear, vendor-neutral primer on the core ideas and benefits." />
+  <Resource type="lab" title="Implementing Microservices on AWS" href="https://docs.aws.amazon.com/whitepapers/latest/microservices-on-aws/microservices.html" desc="A whitepaper walking a real reference architecture end to end." />
+</ResourceGrid>
+
+## 🔨 Build this
+
+<Steps>
+<Step>
+**Start with a monolith.** Take (or build) a small monolithic app — say an order system with
+Users, Orders, and Notifications all in one codebase and one database. Get it working and note how
+easy the in-process calls and single transaction are. This is your baseline.
+</Step>
+<Step>
+**Extract one service with its own DB.** Pull *one* feature — Notifications is a good first cut —
+into its own service with its **own database**. The monolith no longer reads that service's tables;
+it calls the service's API instead. Congratulations: you now have a network boundary and two
+deploys.
+</Step>
+<Step>
+**Go async and add a gateway.** Replace the synchronous "send notification" call with an **event**:
+the monolith publishes `OrderPlaced`, the notification service subscribes and reacts. Put an API
+gateway in front so clients hit one URL, not two. Watch how the monolith no longer waits on (or
+fails with) the notification service.
+</Step>
+<Step>
+**Break it on purpose.** Kill the notification service mid-flow. Does an order still get placed?
+Now introduce a saga: if payment fails after the order is created, emit a compensating event to
+cancel the order. Trace one request across both services — feel how much harder observability just
+got, and why you need it.
+</Step>
+</Steps>
+
+## Interview signals & common pitfalls
+
+- **Signal of mastery:** when asked "should we use microservices?", you push back with questions —
+  team size, deploy pain, boundary clarity — and you're comfortable recommending "monolith first"
+  when the split isn't justified.
+- **Pitfall:** the shared-database anti-pattern — multiple services on the same tables. You've
+  built a distributed monolith with all the cost and none of the independence.
+- **Pitfall:** assuming microservices equal scalability. Scaling is a load-balancing and data
+  problem; microservices are an *organizational* and *deployability* solution.
+- **Pitfall:** chatty synchronous call chains — service A calls B calls C calls D — multiplying
+  latency and coupling availability. Prefer async events for cross-service workflows.
+- **Pitfall:** splitting too early, before you understand the domain. Boundaries are expensive to
+  move once each service owns its data.
+
+## Mastery checklist
+
+<Checklist id="microservices">
+  <Check>I can make the honest case for staying a monolith, and explain "monolith first".</Check>
+  <Check>I can define service boundaries using bounded contexts and business capabilities.</Check>
+  <Check>I know when to use synchronous REST/gRPC versus asynchronous events.</Check>
+  <Check>I understand database-per-service and why the shared database is an anti-pattern.</Check>
+  <Check>I can explain the role of an API gateway and service discovery.</Check>
+  <Check>I can describe a saga and compensating transactions for distributed workflows.</Check>
+  <Check>I can articulate why microservices are not, by themselves, a scalability strategy.</Check>
+  <Check>I understand the observability and testing challenges a split introduces.</Check>
+</Checklist>
+
+<Callout type="info">
+Next up in the roadmap: [Load Balancing](/docs/architecture/load-balancing) — once you've got
+multiple services and multiple instances of each, you need to spread traffic across them well.
+</Callout>

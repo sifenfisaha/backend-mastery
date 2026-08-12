@@ -1,0 +1,151 @@
+---
+title: Docker
+description: Package any app and its environment into a portable, reproducible container — the unit of deployment for modern backends.
+icon: Container
+---
+
+## Why this matters
+
+"It works on my machine" is the oldest lie in software. Docker kills it. A container bundles your
+app **with** its runtime, libraries, and config into one immutable image that runs identically on
+your laptop, a teammate's laptop, CI, and production. Every later topic in this guide — Kubernetes,
+CI/CD, microservices, local Kafka and Postgres — assumes you're comfortable with containers. This is
+the first real force-multiplier you'll learn.
+
+<MentorNote>
+Don't confuse Docker with virtual machines. A VM virtualizes *hardware* and boots a whole OS
+(gigabytes, seconds to start). A container virtualizes the *operating system* — it's just isolated
+processes sharing the host kernel (megabytes, milliseconds to start). Once that clicks, everything
+else about Docker makes sense.
+</MentorNote>
+
+## Mental model
+
+Think of it like shipping:
+
+- A **Dockerfile** is a recipe — the ordered steps to build your app's environment.
+- An **image** is the sealed shipping container built from that recipe — read-only, versioned, shareable.
+- A **container** is that image *running* — a live, isolated process. You can start dozens from one image.
+- A **registry** (Docker Hub, GHCR) is the port — where images are pushed and pulled.
+
+Images are built in **layers**, and layers are cached. Order your Dockerfile so the things that
+change least (installing dependencies) come *before* the things that change most (copying your
+source), and rebuilds go from minutes to seconds.
+
+## Core concepts to master
+
+<Accordions type="single">
+<Accordion title="Images, layers & the build cache">
+Each instruction in a Dockerfile creates a layer. Docker caches layers and reuses them if nothing
+above changed. Copy `package.json` and install deps *before* copying the rest of your code, so a
+code change doesn't bust your dependency cache. Use `.dockerignore` to keep junk (node_modules,
+.git) out of the build context.
+</Accordion>
+<Accordion title="Containers, volumes & networks">
+Containers are ephemeral — when one dies, its writable layer is gone. Persist data with **volumes**.
+Let containers talk to each other over a user-defined **bridge network** using service names as
+hostnames. Map ports to the host with `-p 8080:80` only when you need outside access.
+</Accordion>
+<Accordion title="Dockerfile essentials">
+`FROM` (base image) · `WORKDIR` · `COPY` · `RUN` (build-time commands) · `ENV` · `EXPOSE` ·
+`CMD` vs `ENTRYPOINT` (what runs when the container starts). Prefer small bases (`alpine`,
+`-slim`) and pin versions.
+</Accordion>
+<Accordion title="Multi-stage builds">
+Build in a fat image (with compilers, dev deps), then copy just the artifact into a tiny runtime
+image. Your production image ships without the toolchain — smaller, faster, and a smaller attack
+surface.
+</Accordion>
+<Accordion title="Docker Compose">
+Define a multi-container app (API + Postgres + Redis) in one `docker-compose.yml` and bring it all
+up with `docker compose up`. This is how you'll run local dev stacks for the rest of this program.
+</Accordion>
+</Accordions>
+
+## 📺 Watch
+
+<VideoGrid>
+  <VideoCard id="Gjnup-PuquQ" title="Docker in 100 Seconds" channel="Fireship" duration="2 min" />
+  <VideoCard id="pg19Z8LL06w" title="Docker Crash Course for Absolute Beginners" channel="TechWorld with Nana" duration="1 hr" />
+  <VideoCard id="eGz9DS-aIeY" title="you need to learn Docker RIGHT NOW!!" channel="NetworkChuck" duration="24 min" />
+  <VideoCard id="3c-iBn73dDE" title="Docker Tutorial for Beginners [FULL COURSE]" channel="TechWorld with Nana" duration="3 hr" />
+</VideoGrid>
+
+<MentorNote title="What to actually watch">
+Start with Fireship for the 2-minute mental model. Then do **one** of the longer courses (Nana's
+crash course is the sweet spot). Skip the rest unless you're stuck — you'll learn more from the lab
+below than from a fourth video.
+</MentorNote>
+
+## 📚 Read
+
+<ResourceGrid>
+  <Resource type="doc" title="Docker: Get Started" href="https://docs.docker.com/get-started/" desc="The official, hands-on introduction." />
+  <Resource type="doc" title="Dockerfile Best Practices" href="https://docs.docker.com/build/building/best-practices/" desc="How to write fast, small, correct images." />
+  <Resource type="course" title="Docker Curriculum" href="https://docker-curriculum.com/" desc="A superb free end-to-end tutorial by Prakhar Srivastav." />
+  <Resource type="lab" title="Play with Docker" href="https://labs.play-with-docker.com/" desc="A free in-browser Docker playground — no install." />
+</ResourceGrid>
+
+## 🔨 Build this
+
+<Steps>
+<Step>
+**Containerize a single app.** Take an existing API of yours (or a tiny new one). Write a
+`Dockerfile`, add a `.dockerignore`, build it, and run it: `docker build -t myapp . && docker run -p
+8080:8080 myapp`.
+</Step>
+<Step>
+**Make it small.** Convert it to a multi-stage build and switch to a `-slim`/`alpine` base. Compare
+image sizes with `docker images` — aim to cut it by more than half.
+</Step>
+<Step>
+**Add a database with Compose.** Write a `docker-compose.yml` with your app + PostgreSQL + Redis on
+a shared network, using named volumes for persistence. `docker compose up` should start the whole
+stack.
+</Step>
+<Step>
+**Break it and observe.** `docker compose down` without `-v`, bring it back — is your data still
+there? Now with `-v`. Read logs with `docker compose logs -f`. Exec into a container with
+`docker exec -it <name> sh`.
+</Step>
+</Steps>
+
+## Cheat sheet
+
+```bash
+docker build -t myapp:1.0 .        # build an image from the Dockerfile here
+docker run -d -p 8080:80 myapp:1.0 # run detached, map host:container ports
+docker ps                          # list running containers
+docker logs -f <container>         # follow logs
+docker exec -it <container> sh     # shell into a running container
+docker compose up -d               # start a multi-container stack
+docker system prune -af            # reclaim disk (careful!)
+```
+
+## Interview signals & common pitfalls
+
+- **Signal of mastery:** you can explain *why* a Dockerfile is ordered the way it is (layer caching)
+  and reach for multi-stage builds without prompting.
+- **Pitfall:** putting `COPY . .` before installing dependencies — every code change reinstalls
+  everything.
+- **Pitfall:** storing state inside the container instead of a volume, then losing data on redeploy.
+- **Pitfall:** running as root inside the container. Add a non-root `USER` for production images.
+- **Pitfall:** baking secrets into an image. They live forever in the layer history — use env vars
+  or secret managers instead.
+
+## Mastery checklist
+
+<Checklist id="docker">
+  <Check>I can explain the difference between an image, a container, and a VM.</Check>
+  <Check>I can write a Dockerfile from scratch and know when to use CMD vs ENTRYPOINT.</Check>
+  <Check>I order instructions to take advantage of layer caching.</Check>
+  <Check>I use multi-stage builds to produce small production images.</Check>
+  <Check>I can persist data with volumes and connect containers over a network.</Check>
+  <Check>I can bring up a multi-service app with a single `docker compose up`.</Check>
+  <Check>I know how to shell into a container and read its logs to debug it.</Check>
+</Checklist>
+
+<Callout type="info">
+Next up in the roadmap: the [Data Layer](/docs/data/postgresql) — now that you can run Postgres and
+Redis in containers, it's time to actually use them well.
+</Callout>

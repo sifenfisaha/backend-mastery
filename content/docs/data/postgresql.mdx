@@ -1,0 +1,202 @@
+---
+title: PostgreSQL
+description: Design schemas, choose the right indexes, use transactions correctly, and read query plans with EXPLAIN.
+icon: Database
+---
+
+## Why this matters
+
+Almost every backend you'll ever build has a relational database at its core, and PostgreSQL is the
+one senior engineers reach for by default. It's not just a place to dump rows — it's a correctness
+engine. Get the schema, constraints, and transactions right and the database enforces your business
+rules no matter how buggy your application code is. Get indexes and query plans right and the same
+hardware serves 100x the traffic. The gap between a mid-level dev and a senior one shows up fast
+here: juniors treat the database as a dumb bucket, seniors treat it as the most trustworthy part of
+the system.
+
+<MentorNote>
+Don't confuse a slow query with a slow database. Ninety percent of "Postgres is slow" is a missing
+index, a sequential scan over a huge table, or an N+1 loop in the app — not the server. Before you
+add a read replica or a cache, run `EXPLAIN ANALYZE` and read the plan. The database is almost
+always telling you exactly what's wrong; you just have to look.
+</MentorNote>
+
+## Mental model
+
+Think of a table like a giant spreadsheet, and an index like the alphabetical tab dividers in a
+filing cabinet:
+
+- The **table** (heap) is where the rows actually live, in no particular order.
+- An **index** is a separate, sorted structure that says "value X is at row location Y" — so Postgres
+  can jump straight to matching rows instead of scanning every one.
+- A **constraint** (primary key, foreign key, unique, check) is a rule the database refuses to break,
+  so bad data can never get in.
+- A **transaction** is an all-or-nothing envelope: everything inside commits together or rolls back
+  together, and other connections don't see your half-finished work.
+
+The whole game is: model the data so the constraints do your validation, then make the queries you
+actually run fast with the right indexes. Everything else is detail.
+
+## Core concepts to master
+
+<Accordions type="single">
+<Accordion title="Relational modeling & normalization">
+Normalization means storing each fact exactly once. Third normal form (3NF) is the practical target:
+every non-key column depends on the key, the whole key, and nothing but the key. Split repeating
+groups into their own tables and join them back. This kills update anomalies — you change a
+customer's email in one place, not 400 rows. Denormalize *deliberately* and later, only when a
+measured read path demands it, never by accident.
+</Accordion>
+<Accordion title="Data types & constraints">
+Pick the tightest type that fits: `bigint` for ids, `text` (not `varchar(n)` — Postgres treats them
+the same but `text` avoids arbitrary limits), `timestamptz` (never naive `timestamp`), `numeric` for
+money, `boolean`, `jsonb` for semi-structured data, `uuid` for external ids. Then let constraints
+enforce truth: `PRIMARY KEY`, `NOT NULL`, `UNIQUE`, `CHECK (amount >= 0)`, and `FOREIGN KEY ...
+REFERENCES` with the right `ON DELETE` behavior. A constraint in the schema beats a validation in
+code every time.
+</Accordion>
+<Accordion title="Indexes: B-tree, partial, composite, covering">
+The default **B-tree** index handles equality and range (`=`, `<`, `>`, `BETWEEN`, `ORDER BY`).
+A **composite** index on `(a, b)` serves queries filtering on `a` or `a` and `b` — leftmost-prefix
+rule, so it won't help a query filtering only on `b`. A **partial** index (`WHERE status =
+'active'`) indexes just the rows you query, staying small. A **covering** index (`INCLUDE (...)`)
+lets Postgres answer straight from the index without touching the heap — an index-only scan. Indexes
+cost you on every write, so index the columns you filter, join, and sort on — not every column.
+</Accordion>
+<Accordion title="Transactions, ACID & isolation levels">
+A transaction is **A**tomic (all or nothing), **C**onsistent (constraints hold), **I**solated
+(concurrent transactions don't corrupt each other), and **D**urable (once committed, it survives a
+crash). Isolation levels trade correctness for concurrency: `READ COMMITTED` (the default) sees each
+statement's fresh snapshot; `REPEATABLE READ` freezes one snapshot for the whole transaction;
+`SERIALIZABLE` behaves as if transactions ran one at a time and aborts conflicts you must retry.
+Wrap multi-step writes (transfer money, create order plus line items) in a single transaction.
+</Accordion>
+<Accordion title="MVCC & how Postgres handles concurrency">
+Postgres uses **Multi-Version Concurrency Control**: writers create new row versions instead of
+overwriting, so readers never block writers and writers never block readers. Each transaction sees a
+consistent snapshot. The cost is dead tuples — old versions that `VACUUM` (usually autovacuum)
+cleans up. This is why an `UPDATE`-heavy table can bloat, and why long-running transactions are
+dangerous: they hold back vacuum and let dead rows pile up.
+</Accordion>
+<Accordion title="EXPLAIN ANALYZE & reading query plans">
+`EXPLAIN` shows the planned strategy; `EXPLAIN ANALYZE` actually runs it and shows real timings and
+row counts. Read it inside-out: the deepest node runs first. Watch for a `Seq Scan` on a big table
+(usually a missing index), a big gap between estimated and actual rows (stale statistics — run
+`ANALYZE`), and expensive `Sort` or `Nested Loop` nodes. An `Index Scan` or `Index Only Scan` on the
+hot path is what you're aiming for.
+</Accordion>
+</Accordions>
+
+## 📺 Watch
+
+<VideoGrid>
+  <VideoCard id="qw--VYLpxG4" title="Learn PostgreSQL — Full Course for Beginners" channel="freeCodeCamp" duration="4 hr 20 min" />
+  <VideoCard id="Q56kljmIN14" title="PostgreSQL Internal Architecture Explained" channel="Hussein Nasser" duration="33 min" />
+  <VideoCard id="n2Fluyr3lbc" title="PostgreSQL in 100 Seconds" channel="Fireship" duration="2 min" />
+  <VideoCard id="3JW732GrMdg" title="I replaced my entire tech stack with Postgres" channel="Fireship" duration="6 min" />
+</VideoGrid>
+
+<MentorNote title="What to actually watch">
+Start with the Fireship 100-seconds clip for the shape of it, then work through the freeCodeCamp
+full course hands-on — that's where the real learning is. Save Hussein Nasser's internals video for
+when you want to understand *why* MVCC and indexes behave the way they do. The "replaced my tech
+stack" video is fun context; skip it if you're short on time.
+</MentorNote>
+
+## 📚 Read
+
+<ResourceGrid>
+  <Resource type="doc" title="PostgreSQL Official Tutorial" href="https://www.postgresql.org/docs/current/tutorial.html" desc="The authoritative, surprisingly readable getting-started guide." />
+  <Resource type="course" title="PostgreSQLTutorial.com" href="https://www.postgresqltutorial.com/" desc="Practical, example-driven walkthroughs of every SQL feature." />
+  <Resource type="article" title="Use The Index, Luke!" href="https://use-the-index-luke.com/" desc="The best free explanation of how indexes actually work." />
+  <Resource type="doc" title="PostgreSQL Indexes Chapter" href="https://www.postgresql.org/docs/current/indexes.html" desc="Official reference on B-tree, partial, composite, and covering indexes." />
+  <Resource type="lab" title="PG Exercises" href="https://pgexercises.com/" desc="An in-browser set of graded SQL problems against a real schema." />
+</ResourceGrid>
+
+## 🔨 Build this
+
+<Steps>
+<Step>
+**Design a normalized schema.** Model a small domain — say customers, orders, and order_items. Give
+each table a `bigint` primary key, add `NOT NULL` and `CHECK` constraints, and wire `FOREIGN KEY`
+relationships with sensible `ON DELETE` rules. Aim for 3NF: no repeated data across tables.
+</Step>
+<Step>
+**Seed it with real volume.** Insert a meaningful amount of data — tens or hundreds of thousands of
+rows using `generate_series`. You need enough rows that a sequential scan actually hurts; a
+100-row table makes every query look fast and teaches you nothing.
+</Step>
+<Step>
+**Find three slow queries.** Write a filter query, a join, and a query with `ORDER BY ... LIMIT`.
+Run each with `EXPLAIN ANALYZE` and note the `Seq Scan` nodes and total time. Write the timings down
+— you'll compare against them next.
+</Step>
+<Step>
+**Make them fast with indexes.** Add a targeted index for each: a plain B-tree for the filter, a
+composite index matching your join and sort order, and a partial or covering index where it fits.
+Re-run `EXPLAIN ANALYZE` and confirm the plan flipped to an `Index Scan` and the time dropped. That
+before/after is the whole skill.
+</Step>
+</Steps>
+
+## Cheat sheet
+
+```sql
+-- schema & constraints
+CREATE TABLE orders (
+  id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  customer_id bigint NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  status      text   NOT NULL CHECK (status IN ('open','paid','shipped')),
+  total       numeric(12,2) NOT NULL CHECK (total >= 0),
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+-- indexes
+CREATE INDEX ON orders (customer_id);                 -- B-tree for joins/filters
+CREATE INDEX ON orders (customer_id, created_at);     -- composite (leftmost prefix)
+CREATE INDEX ON orders (created_at) WHERE status = 'open';  -- partial
+CREATE INDEX ON orders (customer_id) INCLUDE (total); -- covering (index-only scan)
+
+-- transactions
+BEGIN;
+  UPDATE accounts SET balance = balance - 100 WHERE id = 1;
+  UPDATE accounts SET balance = balance + 100 WHERE id = 2;
+COMMIT;   -- or ROLLBACK;
+
+-- read the plan
+EXPLAIN ANALYZE SELECT * FROM orders WHERE customer_id = 42 ORDER BY created_at DESC LIMIT 20;
+ANALYZE orders;   -- refresh planner statistics
+```
+
+## Interview signals & common pitfalls
+
+- **Signal of mastery:** you can look at a slow query, predict what `EXPLAIN ANALYZE` will show, and
+  name the exact index that will flip a `Seq Scan` into an `Index Scan` — and explain why a composite
+  index's column order matters.
+- **Pitfall:** the N+1 query — looping in the app and firing one query per row instead of a single
+  join or `WHERE id = ANY(...)`. It looks fine on 10 rows and melts on 10,000.
+- **Pitfall:** missing indexes on foreign keys and filter columns, so every lookup is a full table
+  scan that only gets slower as data grows.
+- **Pitfall:** `SELECT *` everywhere — you fetch columns you don't need, defeat covering indexes, and
+  break silently when the schema changes.
+- **Pitfall:** running long-lived or "idle in transaction" connections, which block autovacuum and
+  bloat your tables. And in production, always sit behind a connection pooler (PgBouncer) — Postgres
+  connections are expensive, and thousands of them will exhaust the server.
+
+## Mastery checklist
+
+<Checklist id="postgresql">
+  <Check>I can design a normalized (3NF) schema and know when to denormalize deliberately.</Check>
+  <Check>I choose tight data types and enforce rules with NOT NULL, CHECK, UNIQUE, and FOREIGN KEY.</Check>
+  <Check>I can explain B-tree, partial, composite, and covering indexes and when each helps.</Check>
+  <Check>I understand ACID and can pick the right isolation level for a workload.</Check>
+  <Check>I can explain MVCC and why long transactions and dead tuples cause bloat.</Check>
+  <Check>I read `EXPLAIN ANALYZE` output and turn a Seq Scan into an Index Scan.</Check>
+  <Check>I know why connection pooling matters and use PgBouncer in production.</Check>
+  <Check>I can spot and fix N+1 queries, missing indexes, and needless `SELECT *`.</Check>
+</Checklist>
+
+<Callout type="info">
+Next up in the roadmap: [Redis](/docs/data/redis) — once your queries are fast, the next lever is
+keeping the hottest data in memory so you don't hit Postgres at all.
+</Callout>

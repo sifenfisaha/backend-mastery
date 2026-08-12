@@ -1,0 +1,173 @@
+---
+title: Testing
+description: Build a test suite you trust — the pyramid, TDD, integration, contract and load testing.
+icon: TestTube
+---
+
+## Why this matters
+
+Tests are not about proving your code is correct — they're about giving you the **confidence to change
+it**. A senior engineer ships fast precisely because a green suite has their back: they can refactor a
+gnarly module, upgrade a dependency, or delete dead code at 5pm on a Friday and *know* within seconds
+whether they broke something. Without tests, every change is a gamble, so the codebase calcifies and
+everyone gets slower. The goal of this page isn't 100% coverage — it's a suite that's fast, honest, and
+worth trusting.
+
+<MentorNote>
+Don't confuse *coverage* with *confidence*. Coverage measures which lines executed while your tests
+ran; it says nothing about whether you *asserted* the right thing. You can hit 100% coverage with tests
+that assert nothing. Chase confidence — "would this suite catch a real regression?" — and let coverage
+be a diagnostic, never the target.
+</MentorNote>
+
+## Mental model
+
+Think of your suite as a **pyramid**:
+
+- **Unit tests** are the wide base — tiny, fast, testing one function or class in isolation. You have hundreds; they run in milliseconds.
+- **Integration tests** are the middle — a few dozen, checking that your code talks to a real database, cache, or queue correctly.
+- **End-to-end tests** are the narrow tip — a handful, driving the whole system like a user would. Slow and flaky, so you keep them few.
+
+The anti-pattern is the **ice cream cone**: a fat layer of slow e2e tests on top, almost no units at the
+bottom. It runs for 40 minutes, fails randomly, and nobody trusts it. Push tests *down* the pyramid —
+the lower a bug is caught, the cheaper and faster the feedback.
+
+## Core concepts to master
+
+<Accordions type="single">
+<Accordion title="The test pyramid & the ice cream cone">
+Fowler's pyramid is a heuristic for *proportion*: many fast unit tests, fewer integration tests, very
+few e2e. The "ice cream cone" inverts it — mostly UI/e2e tests — and you pay for it with slow,
+brittle CI. When a bug can be caught by a unit test, don't reach for an e2e test. Every layer up is
+slower to run and harder to debug.
+</Accordion>
+<Accordion title="What makes a good test">
+Four properties: **fast** (milliseconds, so you run them constantly), **isolated** (order-independent,
+no shared mutable state, no reliance on another test), **deterministic** (same result every run — no
+`sleep`, no real clocks, no live network), and **readable** (the test name and body document the
+behavior). A test you don't trust is worse than no test, because it trains you to ignore red.
+</Accordion>
+<Accordion title="TDD: red-green-refactor">
+Write a failing test first (**red**), write the minimum code to pass it (**green**), then clean up the
+design with the test still passing (**refactor**). TDD isn't really about testing — it's a design
+discipline that forces small steps and testable, decoupled code. You don't have to do it always, but
+knowing how is a senior-level skill.
+</Accordion>
+<Accordion title="Test doubles — and not over-mocking">
+**Stubs** return canned answers, **mocks** assert on interactions (was this called?), **fakes** are
+lightweight working implementations (an in-memory repo). Doubles isolate the unit under test — but
+over-mock and your tests just assert your implementation, breaking on every refactor while catching no
+real bugs. Rule of thumb: mock at the edges (network, clock, third-party), use real objects inside.
+</Accordion>
+<Accordion title="Integration & contract testing">
+Unit tests can't tell you your SQL is wrong or your queue serialization is broken — for that you need
+**integration tests against real dependencies**. Spin up a real Postgres/Redis/Kafka in a throwaway
+container with **Testcontainers**. For microservices, **contract testing** (Pact) verifies that a
+consumer and provider agree on the API shape *without* deploying both together — catching breaking
+changes before they hit production.
+</Accordion>
+<Accordion title="Load & performance testing">
+Functional tests say "it works"; load tests say "it works *under 5,000 requests per second*." Tools
+like **k6** script realistic traffic and assert on p95 latency and error rate. Run them against a
+staging environment to find the breaking point *before* your users do, and to catch performance
+regressions in CI.
+</Accordion>
+</Accordions>
+
+## 📺 Watch
+
+<VideoGrid>
+  <VideoCard id="ihOUzzwPFIk" title="The 3 Types of Unit Test in TDD" channel="Dave Farley (GOTO 2022)" duration="15 min" />
+  <VideoCard id="Geq60OVyBPg" title="Unit & Integration Testing Tutorial" channel="Amigoscode" duration="2 hr 40 min" />
+  <VideoCard id="ILmSEyeM9IU" title="TDD vs BDD" channel="Dave Farley (GOTO 2022)" duration="17 min" />
+  <VideoCard id="IInciWyU74U" title="Let's Chat About Unit Tests" channel="ThePrimeagen" duration="30 min" />
+</VideoGrid>
+
+<MentorNote title="What to actually watch">
+Start with Dave Farley's "3 Types of Unit Test" for the mental model of what a unit test really is.
+Then work through Amigoscode's tutorial hands-on — it's long, so treat it as a reference, not a
+binge. ThePrimeagen's chat is a great counterweight on *not* over-testing; watch it once you've
+written a few suites and have opinions of your own.
+</MentorNote>
+
+## 📚 Read
+
+<ResourceGrid>
+  <Resource type="article" title="The Practical Test Pyramid" href="https://martinfowler.com/articles/practical-test-pyramid.html" desc="Fowler's definitive guide to test proportions and layers." />
+  <Resource type="article" title="Test Driven Development" href="https://martinfowler.com/bliki/TestDrivenDevelopment.html" desc="What TDD is (and isn't), by Martin Fowler." />
+  <Resource type="article" title="Testing Strategies in a Microservice Architecture" href="https://martinfowler.com/articles/microservice-testing/" desc="How the pyramid, integration and contract tests fit distributed systems." />
+  <Resource type="doc" title="Pact — Contract Testing Docs" href="https://docs.pact.io/" desc="Consumer-driven contract testing for services that must agree on an API." />
+  <Resource type="lab" title="Gilded Rose Refactoring Kata" href="https://github.com/emilybache/GildedRose-Refactoring-Kata" desc="The classic kata: characterize legacy code, then refactor under green." />
+</ResourceGrid>
+
+## 🔨 Build this
+
+<Steps>
+<Step>
+**Characterize before you touch.** Clone the [Gilded Rose kata](https://github.com/emilybache/GildedRose-Refactoring-Kata)
+in your language of choice. Before changing a line, write **characterization tests** that pin down the
+current behavior — feed items through the messy `updateQuality` logic and assert whatever it does
+today, quirks included. Aim for full coverage of the existing behavior.
+</Step>
+<Step>
+**Refactor under green.** With the tests green, clean up the tangled conditionals into readable,
+type-aware code. Run the suite after every small change. If it stays green, your refactor preserved
+behavior; if it goes red, you just caught a regression the safety net you built in step 1 protected
+you from.
+</Step>
+<Step>
+**Add a real integration test.** Take a piece of your own code that talks to a database. Use
+**Testcontainers** to spin up a real Postgres in a throwaway container, run your queries against it,
+and assert on the results. Notice what this catches that a mocked repository never could — wrong SQL,
+bad migrations, serialization bugs.
+</Step>
+<Step>
+**Wire it into CI and measure.** Run the whole suite in your CI pipeline on every push, failing the
+build on red. Add a coverage report as a *guide* (not a gate you game), and — if you have an API —
+script a small **k6** load test asserting p95 latency stays under your budget.
+</Step>
+</Steps>
+
+## Cheat sheet
+
+```bash
+# A quick heuristic for where a test belongs:
+# - Pure logic, one unit?          -> unit test (fast, mock the edges)
+# - Talks to a real DB/queue/cache? -> integration test (Testcontainers)
+# - Two services must agree on API? -> contract test (Pact)
+# - Whole system, like a user?      -> e2e (keep these few)
+# - Does it hold up under traffic?  -> load test (k6)
+
+k6 run load-test.js            # run a k6 load/performance script
+# assert on p95 latency + error rate; run against staging, not prod
+```
+
+## Interview signals & common pitfalls
+
+- **Signal of mastery:** you talk about tests in terms of *confidence and feedback speed*, know when to
+  push a test down the pyramid, and can explain when *not* to mock.
+- **Pitfall:** the ice cream cone — leaning on slow, flaky e2e tests because the code wasn't designed to
+  be unit-testable.
+- **Pitfall:** over-mocking until tests assert the implementation, not the behavior. They pass while the
+  feature is broken and break on every harmless refactor.
+- **Pitfall:** treating coverage as the goal — writing assertion-free tests to hit a number.
+- **Pitfall:** non-deterministic tests (real clocks, `sleep`, shared state, live network) that fail
+  randomly until the team learns to ignore red.
+
+## Mastery checklist
+
+<Checklist id="testing">
+  <Check>I can explain the test pyramid and why the ice cream cone is an anti-pattern.</Check>
+  <Check>I know the four properties of a good test: fast, isolated, deterministic, readable.</Check>
+  <Check>I can practice red-green-refactor and explain TDD as a design discipline.</Check>
+  <Check>I know the difference between mocks, stubs and fakes — and when not to over-mock.</Check>
+  <Check>I can write integration tests against real dependencies with Testcontainers.</Check>
+  <Check>I understand contract testing (Pact) for keeping microservices in sync.</Check>
+  <Check>I can write a load test with k6 and assert on p95 latency and error rate.</Check>
+  <Check>I treat coverage as a guide, run the suite in CI, and fail builds on red.</Check>
+</Checklist>
+
+<Callout type="info">
+Next up in the roadmap: the [Capstone Projects](/docs/capstones) — put everything together and build
+something real, with a suite you actually trust behind it.
+</Callout>

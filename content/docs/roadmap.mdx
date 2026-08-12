@@ -1,0 +1,117 @@
+---
+title: The 90-Day Roadmap
+description: A week-by-week plan that sequences all 17 topics from foundations to production, with a build target every single week.
+icon: CalendarDays
+---
+
+This is the plan. Thirteen weeks, three phases, one build target per week. It's sequenced so you
+never hit a topic before its prerequisites. Budget **~10–12 focused hours a week** — roughly 90
+minutes a day. If you have less time, don't skip topics; stretch the plan to 5 months instead.
+
+<MentorNote title="How to actually finish this">
+The people who complete a plan like this aren't the smartest — they're the ones who **build every
+week** and **never let two weeks pass without shipping something**. Watching videos feels like
+progress but isn't. The lab is the progress. Treat the videos as *just enough* to unblock the build.
+</MentorNote>
+
+## The rhythm of a week
+
+<Steps>
+<Step>**Mon–Tue — Absorb.** Watch the mental-model video + one deep dive on the topic page.</Step>
+<Step>**Wed–Thu — Build.** Do that topic's "Build this" lab. Break it on purpose. Fix it.</Step>
+<Step>**Fri — Consolidate.** Tick the mastery checklist. Write 5 sentences explaining the topic from memory.</Step>
+<Step>**Weekend — Optional.** Rest, or push the build further. Recovery is part of the plan.</Step>
+</Steps>
+
+## Phase 1 · Month 1 — Foundations & Data
+
+> Goal: be completely comfortable in a Linux shell, containerize anything, and model + query data
+> like you mean it. Everything later stands on this.
+
+<Roadmap>
+<Phase title="Month 1 — Foundations & Data" subtitle="Weeks 1–4 · the ground everything stands on">
+<Week n={1} title="Linux & Networking">
+Live in the terminal. Learn processes, permissions, pipes, and the network path a request actually
+travels: DNS → TCP → TLS → HTTP.
+- Topic: [Linux & Networking](/docs/foundations/linux-networking)
+- **Build:** a bash script that health-checks a URL (DNS resolve, TCP connect, TLS expiry, HTTP status) and logs results.
+</Week>
+<Week n={2} title="Docker">
+Containerize a real app. Understand images vs containers, layers, volumes, networks, and Compose.
+- Topic: [Docker](/docs/foundations/docker)
+- **Build:** dockerize one of your existing apps + its database with a single `docker compose up`.
+</Week>
+<Week n={3} title="PostgreSQL">
+Schema design, the right indexes, transactions, and reading a query plan with `EXPLAIN ANALYZE`.
+- Topic: [PostgreSQL](/docs/data/postgresql)
+- **Build:** design a normalized schema for a small product (e.g. a blog or store), seed it, and make three slow queries fast with indexes.
+</Week>
+<Week n={4} title="Redis + Caching">
+In-memory data structures, then caching patterns: cache-aside, TTLs, and invalidation.
+- Topics: [Redis](/docs/data/redis) · [Caching](/docs/data/caching)
+- **Build (milestone):** add a Redis cache-aside layer in front of a slow Postgres query and measure the latency drop. Now you have a Dockerized API + Postgres + Redis — your Phase-1 stack.
+</Week>
+</Phase>
+
+<Phase title="Month 2 — Architecture & Messaging" subtitle="Weeks 5–9 · think in systems, not files">
+<Week n={5} title="System Design">
+Learn the framework: requirements → estimates → high-level design → deep dives → bottlenecks.
+- Topic: [System Design](/docs/architecture/system-design)
+- **Build:** write a 2-page design doc for a URL shortener (API, schema, scale estimates, caching).
+</Week>
+<Week n={6} title="Distributed Systems">
+The hard truths: partial failure, CAP, replication, consistency, consensus (Raft), consistent hashing.
+- Topic: [Distributed Systems](/docs/architecture/distributed-systems)
+- **Build:** implement consistent hashing in code and simulate adding/removing nodes; observe key movement.
+</Week>
+<Week n={7} title="Microservices">
+Service boundaries, sync vs async communication, data ownership — and when a monolith is the right call.
+- Topic: [Microservices](/docs/architecture/microservices)
+- **Build:** split one feature out of your Phase-1 app into its own service with its own database.
+</Week>
+<Week n={8} title="Load Balancing + Scalability & Reliability">
+L4 vs L7 balancing, health checks, then redundancy, circuit breakers, retries, and SLOs.
+- Topics: [Load Balancing](/docs/architecture/load-balancing) · [Scalability & Reliability](/docs/architecture/scalability-reliability)
+- **Build:** run 3 instances of a service behind NGINX; add a circuit breaker + retry/backoff around a flaky dependency.
+</Week>
+<Week n={9} title="Queues + Kafka/RabbitMQ">
+Async processing, decoupling, dead-letter queues, idempotency — with real brokers.
+- Topics: [Queues & Event-Driven](/docs/messaging/queues-eda) · [Kafka & RabbitMQ](/docs/messaging/kafka-rabbitmq)
+- **Build (milestone):** an event-driven order pipeline — `OrderPlaced` fans out to email + inventory consumers, with a DLQ and idempotent handlers.
+</Week>
+</Phase>
+
+<Phase title="Month 3 — Platform, Ops & Quality" subtitle="Weeks 10–13 · run it in production like a senior">
+<Week n={10} title="Kubernetes">
+Pods, deployments, services, ingress, config/secrets, and autoscaling on a local cluster.
+- Topic: [Kubernetes](/docs/platform/kubernetes)
+- **Build:** deploy your event-driven app to a local k8s cluster (kind/minikube) with an ingress and an HPA.
+</Week>
+<Week n={11} title="AWS & Azure">
+Core cloud primitives: compute, storage, networking, IAM, and the managed versions of everything you built by hand.
+- Topic: [AWS & Azure](/docs/platform/cloud)
+- **Build:** deploy a small service to a free-tier account (S3 static site + a Lambda/Function, or a managed container).
+</Week>
+<Week n={12} title="CI/CD + Observability">
+Automated pipelines with test gates, then logs/metrics/traces and a real dashboard + alert.
+- Topics: [CI/CD](/docs/platform/cicd) · [Observability](/docs/platform/observability)
+- **Build:** a GitHub Actions pipeline that tests + builds + deploys, plus a Prometheus/Grafana dashboard for your app.
+</Week>
+<Week n={13} title="Security + Testing">
+OWASP Top 10, auth done right, secrets handling — and a test suite you actually trust.
+- Topics: [Security](/docs/quality/security) · [Testing](/docs/quality/testing)
+- **Build (capstone):** harden your app against the OWASP Top 10 and get it to a meaningful test pyramid. Then write it all up.
+</Week>
+</Phase>
+</Roadmap>
+
+## After week 13
+
+You now have a portfolio system that is containerized, event-driven, deployed to Kubernetes and the
+cloud, monitored, tested and secured. Turn it into the [**capstone write-up**](/docs/capstones) and
+you can walk into a senior interview and defend every layer.
+
+<Callout type="warn">
+Falling behind is normal. If a week runs long, **extend the timeline — don't skip the build.** A
+half-understood topic you built beats five topics you only watched.
+</Callout>

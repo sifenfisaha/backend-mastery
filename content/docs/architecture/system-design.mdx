@@ -1,0 +1,191 @@
+---
+title: System Design
+description: A repeatable framework to turn vague requirements into a defensible architecture — under interview pressure.
+icon: PencilRuler
+---
+
+## Why this matters
+
+System design is the interview that separates mid-level from senior — and it's the skill you use
+every time you're handed a one-line ticket like "we need notifications" and have to turn it into a
+real architecture. Nobody expects you to memorize the "correct" design. They're watching *how you
+think*: do you pin down requirements before drawing boxes, do you estimate scale, do you name your
+trade-offs out loud, and do you know where the system will break first? A repeatable framework beats
+raw cleverness here. Get the framework right and every design — in an interview or a design doc —
+becomes the same calm, ordered conversation.
+
+<MentorNote>
+Don't confuse *functional* requirements with *non-functional* ones. Functional = what the system
+does ("shorten a URL", "redirect to the original"). Non-functional = how well it does it (latency,
+availability, consistency, scale). Juniors design for the functional list and get surprised by load.
+Seniors let the non-functional numbers — 100M writes/day, `p99` under 100ms, 99.99% uptime — *drive*
+the architecture. The numbers pick your database, your cache, and your bottleneck for you.
+</MentorNote>
+
+## Mental model
+
+Think of a system design interview like an architect meeting a client to design a building:
+
+- **Clarify the brief first.** How many people, what floors, what's the budget? You don't sketch
+  until you know. Same here: nail functional + non-functional requirements before drawing anything.
+- **Do the math.** An architect sizes load-bearing walls from the expected weight. You size the
+  system from back-of-envelope estimates — QPS, storage/year, bandwidth.
+- **Draw the floor plan (high level), then the plumbing (deep dives).** Boxes and arrows first,
+  then zoom into the one or two components that actually matter.
+- **Point at where it cracks.** Every building has a weakest joint. Every system has a bottleneck.
+  Naming it — and fixing it — is the whole job.
+
+Everything is built from the same handful of blocks: a **load balancer** out front, a **cache** and
+**CDN** to absorb reads, a **database with replicas** for durable state, a **queue** to decouple
+slow work, and an **object store** for big blobs. Learn how those six fit together and most designs
+assemble themselves.
+
+## Core concepts to master
+
+<Accordions type="single">
+<Accordion title="The framework: requirements → estimates → API → design → deep dive → bottlenecks">
+Run the same steps every time. **1) Clarify requirements** — functional (features) and
+non-functional (scale, latency, availability, consistency). **2) Back-of-envelope estimates** —
+QPS, storage/year, bandwidth. **3) Define the API** — the handful of endpoints. **4) High-level
+design** — boxes and arrows. **5) Data model** — tables/collections and keys. **6) Deep dives** —
+zoom into the hard parts. **7) Identify and resolve bottlenecks.** Announce each step so the
+interviewer can steer you.
+</Accordion>
+<Accordion title="Back-of-envelope estimation">
+You don't need precision, you need order of magnitude. Convert "100M requests/day" to QPS: divide
+by ~100,000 (seconds in a day, rounded) to get ~1,000 QPS average, then multiply by 2–10x for peak.
+Storage: rows/day × bytes/row × retention. Bandwidth: QPS × payload size. These numbers decide
+whether one Postgres box is fine or you need sharding, a cache, and a CDN. Memorize the round
+numbers: a day is ~86,400 seconds, a char is 1 byte, a typical row is a few hundred bytes.
+</Accordion>
+<Accordion title="The building blocks">
+A **load balancer** spreads traffic across app servers (and hides failures). A **cache** (Redis)
+serves hot reads from memory. A **CDN** pushes static/edge content near users. A **database with
+read replicas** gives durable state and scales reads; **sharding** scales writes. A **queue**
+(Kafka/RabbitMQ) decouples producers from slow consumers so spikes don't topple you. An **object
+store** (S3) holds large blobs — images, video, backups — cheaply. Most designs are just these six,
+wired together.
+</Accordion>
+<Accordion title="Read-heavy vs write-heavy">
+This single question reshapes your whole design. **Read-heavy** (a URL shortener, a news feed): lean
+on caches, CDNs, and read replicas; denormalize and precompute. **Write-heavy** (analytics
+ingestion, logging): lean on queues to buffer bursts, batch writes, and shard or partition to spread
+write load. Ask early "what's the read:write ratio?" — the answer tells you where to spend your
+complexity budget.
+</Accordion>
+<Accordion title="Latency vs throughput">
+**Latency** is how long one request takes; **throughput** is how many you handle per second. They're
+not the same and they trade off. A queue improves throughput (absorbs bursts) but *adds* latency
+(work happens later). Batching raises throughput at the cost of per-item latency. Always know which
+one the requirement cares about — a payment API needs low latency; a nightly report pipeline needs
+high throughput.
+</Accordion>
+<Accordion title="Trade-offs & bottlenecks">
+There is no perfect design, only trade-offs you chose on purpose: consistency vs availability,
+cost vs performance, simplicity vs scale. The senior move is saying *"I'd cache aggressively here
+and accept a few seconds of staleness, because reads dominate"* — stating the cost, not hiding it.
+Then find the bottleneck: the single component that saturates first (usually the database), and
+relieve it with a cache, replicas, sharding, or a queue.
+</Accordion>
+</Accordions>
+
+## 📺 Watch
+
+<VideoGrid>
+  <VideoCard id="quLrc3PbuIw" title="A friendly introduction to System Design" channel="Gaurav Sen" duration="25 min" />
+  <VideoCard id="m8Icp_Cid5o" title="System Design for Beginners Course" channel="freeCodeCamp (Gaurav Sen)" duration="2 hr" />
+  <VideoCard id="FiXOaYnW64w" title="Learn High-Level System Design by Coding YouTube" channel="freeCodeCamp" duration="2 hr" />
+  <VideoCard href="https://www.youtube.com/@ByteByteGo" title="ByteByteGo — System Design series" channel="ByteByteGo" />
+</VideoGrid>
+
+<MentorNote title="What to actually watch">
+Start with Gaurav Sen's 25-minute friendly intro to lock in the framework — it's the highest
+value-per-minute here. Then work through **one** of the longer freeCodeCamp courses (the "by coding
+YouTube" one is great because it grounds theory in a concrete build). Keep the ByteByteGo channel as
+a browsable reference — dip in for the specific block you're weak on rather than binging it.
+</MentorNote>
+
+## 📚 Read
+
+<ResourceGrid>
+  <Resource type="doc" title="The System Design Primer" href="https://github.com/donnemartin/system-design-primer" desc="The single best free resource — the framework, the blocks, and worked example problems." />
+  <Resource type="doc" title="System Design 101 (ByteByteGo)" href="https://github.com/ByteByteGoHq/system-design-101" desc="Visual, diagram-first explanations of every core concept and pattern." />
+  <Resource type="book" title="Designing Data-Intensive Applications" href="https://dataintensive.net/" desc="The deep bible on data systems — read it slowly, over months. Worth every page." />
+  <Resource type="lab" title="AWS Well-Architected Framework" href="https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html" desc="How real cloud architects reason about trade-offs across reliability, cost, and performance." />
+</ResourceGrid>
+
+## 🔨 Build this
+
+<Steps>
+<Step>
+**Clarify and estimate a URL shortener.** Write down the functional requirements (shorten a long
+URL, redirect a short code to the original) and non-functional ones (highly available, low-latency
+redirects, read-heavy). Then do the back-of-envelope math: assume 100M new URLs/day and a 100:1
+read:write ratio. Compute write QPS, read QPS, and storage over 5 years.
+</Step>
+<Step>
+**Design the API and data model.** Define two endpoints — one to create a short URL, one to redirect
+from a `<shortcode>`. Design the table: what columns, what's the primary key, how do you generate a
+unique short code (counter + base62 vs hash)? Note the trade-off you picked and why.
+</Step>
+<Step>
+**Draw the high-level design.** Sketch boxes and arrows: client → load balancer → app servers →
+cache → database. Add a read path that hits Redis first and falls back to the DB. Mark where read
+replicas and a CDN would go. Label this as your read-heavy optimization.
+</Step>
+<Step>
+**Write the 2-page design doc.** Assemble steps 1–3 into a crisp two-page document: Requirements,
+Estimates, API, Data Model, High-Level Design, and a final "Bottlenecks & Trade-offs" section naming
+where the system breaks first and how you'd relieve it. This is the exact artifact you'll produce in
+Week 5 of the roadmap — and in a real design review.
+</Step>
+</Steps>
+
+## Cheat sheet
+
+```text
+FRAMEWORK (say each step out loud)
+1. Requirements    functional (features) + non-functional (scale, latency, availability, consistency)
+2. Estimates       QPS = requests/day ÷ ~86,400 ; peak = avg × 2–10 ; storage = rows × bytes × retention
+3. API             the 2–5 endpoints, request/response shape
+4. High-level      client → LB → app → cache → DB (+ queue, CDN, object store as needed)
+5. Data model      tables/keys; primary key & index choices
+6. Deep dives      zoom into the 1–2 hard parts
+7. Bottlenecks     what saturates first (usually the DB) → cache / replicas / shard / queue
+
+BLOCKS:  load balancer · cache (Redis) · CDN · DB + replicas · queue (Kafka) · object store (S3)
+LEVERS:  read-heavy → cache/CDN/replicas   |   write-heavy → queue/batch/shard
+```
+
+## Interview signals & common pitfalls
+
+- **Signal of mastery:** you drive the conversation through the framework without prompting, back
+  every choice with a number or a named trade-off, and volunteer where the design breaks *before*
+  the interviewer asks.
+- **Pitfall:** jumping straight to boxes and arrows before clarifying requirements. You'll design
+  the wrong system beautifully.
+- **Pitfall:** skipping the estimates. Without QPS and storage numbers you can't justify a cache, a
+  shard, or anything — your design floats free of reality.
+- **Pitfall:** presenting a design as "the answer" with no trade-offs. Silence on cost reads as not
+  understanding it. Say what you gave up and why.
+- **Pitfall:** over-engineering — reaching for Kafka, sharding, and microservices for a system that
+  a single Postgres box would serve fine. Match complexity to the numbers.
+
+## Mastery checklist
+
+<Checklist id="system-design">
+  <Check>I separate functional from non-functional requirements and let the numbers drive the design.</Check>
+  <Check>I can do back-of-envelope estimates for QPS, storage, and bandwidth in my head.</Check>
+  <Check>I run the same framework every time: requirements → estimates → API → design → data model → deep dive → bottlenecks.</Check>
+  <Check>I know when to reach for each building block: load balancer, cache, CDN, replicas, queue, object store.</Check>
+  <Check>I adjust the design for read-heavy vs write-heavy workloads.</Check>
+  <Check>I can articulate the latency vs throughput trade-off for a given requirement.</Check>
+  <Check>I identify the first bottleneck in a design and name how I'd relieve it.</Check>
+  <Check>I can write a clear 2-page design doc for a system like a URL shortener.</Check>
+</Checklist>
+
+<Callout type="info">
+Next up in the roadmap: [Distributed Systems](/docs/architecture/distributed-systems) — once your
+design spans more than one machine, you inherit a whole new class of problems: consistency,
+consensus, and partial failure. That's where the real depth lives.
+</Callout>

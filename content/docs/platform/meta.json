@@ -1,0 +1,5 @@
+{
+  "title": "Platform & Ops",
+  "icon": "Ship",
+  "pages": ["kubernetes", "cloud", "cicd", "observability"]
+}

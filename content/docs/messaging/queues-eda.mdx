@@ -1,0 +1,180 @@
+---
+title: Queues & Event-Driven Architecture
+description: Decouple services with asynchronous messaging — producers, consumers, DLQs, idempotency and sagas.
+icon: Mailbox
+---
+
+## Why this matters
+
+The moment your system has more than one service, the tempting default is to have them call each
+other directly and synchronously. That works until it doesn't: one slow dependency drags everyone
+down, one deploy takes the whole chain offline, and every new consumer means editing the producer.
+Asynchronous messaging breaks that coupling. A producer drops an event and moves on; consumers react
+on their own schedule. This is the backbone of scalable, resilient backends — it's how you absorb
+traffic spikes, add features without touching existing code, and survive partial failures. Get this
+right and the rest of your distributed system gets dramatically easier.
+
+<MentorNote>
+Don't confuse a **queue** with a **topic**. A queue is point-to-point work distribution: one message
+is delivered to exactly one consumer in a group — great for load-balancing tasks. A pub/sub **topic**
+fans one event out to *every* interested subscriber — great for notifying many parts of the system.
+An **event stream** (like a Kafka log) is a durable, replayable, ordered record you can read from the
+beginning. Picking the wrong one shows up as either duplicated work or missed events.
+</MentorNote>
+
+## Mental model
+
+Think of a busy restaurant kitchen:
+
+- A **producer** is the waiter who pins an order ticket to the rail and walks away — they don't wait for the food.
+- The **queue/topic** is the ticket rail — a buffer that holds work until someone's free to take it.
+- **Consumers** are the cooks pulling tickets at their own pace. Add more cooks and throughput goes up.
+- A **dead-letter queue** is the "problem tickets" spike — anything the kitchen can't make gets set aside for a human, instead of jamming the whole rail.
+
+The waiter and the cooks never block on each other. If the kitchen falls behind, tickets pile up on
+the rail (that's **backpressure**, and it's information, not failure). The rail *decouples* who
+creates work from who does it — in time, in speed, and in identity.
+
+## Core concepts to master
+
+<Accordions type="single">
+<Accordion title="Queue vs pub/sub vs event stream">
+A **queue** distributes each message to one consumer in a competing-consumers group — use it for
+work you want done once. **Pub/sub** broadcasts each event to every subscriber independently — use it
+for notifications. An **event stream** (Kafka-style log) is a durable, ordered, replayable sequence
+where consumers track their own offset — use it when you need history, replay, or many independent
+readers. Many brokers blur these lines; know which semantics you actually need.
+</Accordion>
+<Accordion title="Delivery guarantees">
+**At-most-once**: fire and forget, messages can be lost. **At-least-once**: the broker retries until
+acknowledged, so duplicates are possible — this is the pragmatic default. **Exactly-once** is the
+holy grail and mostly a lie across a network; in practice you get it by combining at-least-once
+delivery with **idempotent** processing. Design for at-least-once and make duplicates harmless.
+</Accordion>
+<Accordion title="Idempotent consumers">
+Because at-least-once means the same message can arrive twice, a consumer must produce the same
+result whether it processes a message once or five times. Give every message a stable **idempotency
+key** (an event id) and record processed keys — skip anything you've already handled. This single
+discipline turns scary duplicate delivery into a non-event.
+</Accordion>
+<Accordion title="Dead-letter queues & retries">
+Some messages will never succeed — bad data, a poisoned payload, a permanently-down dependency.
+Don't let one bad message block the queue or retry forever. Retry a bounded number of times (with
+backoff), then route the failure to a **dead-letter queue** where it's parked for inspection,
+alerting, and manual replay. A DLQ is your safety net and your debugging trail.
+</Accordion>
+<Accordion title="Ordering & backpressure">
+Global ordering across a distributed queue is expensive; most brokers only guarantee order **within
+a partition or key** (e.g. per-`orderId`). Design so that events that must be ordered share a key.
+**Backpressure** is what happens when producers outpace consumers — queue depth grows. Monitor lag,
+scale consumers, and never treat an unbounded queue as free memory.
+</Accordion>
+<Accordion title="Choreography vs orchestration & sagas">
+In **choreography**, services react to each other's events with no central brain — loosely coupled
+but harder to trace. In **orchestration**, a coordinator explicitly drives each step. A **saga**
+manages a multi-service transaction as a sequence of local steps, each with a **compensating action**
+to undo prior work when a later step fails — because you can't hold a distributed lock across
+services.
+</Accordion>
+</Accordions>
+
+## 📺 Watch
+
+<VideoGrid>
+  <VideoCard id="4090Y2im_bg" title="Message Queues & Event-Driven Architecture Explained" channel="Hussein Nasser" duration="15 min" />
+  <VideoCard id="sfQwMu0SCT8" title="Messaging Queues | System Design Basics" channel="Gaurav Sen" duration="9 min" />
+  <VideoCard id="vq7OwvaSauY" title="Event-Driven Architectures | Jay Kreps" channel="Confluent" duration="20 min" />
+  <VideoCard id="LieojY5M9Bk" title="Message Queue — Kafka & RabbitMQ Deep Dive" channel="ByteByteGo" duration="25 min" />
+</VideoGrid>
+
+<MentorNote title="What to actually watch">
+Start with Gaurav Sen for the crisp 9-minute mental model, then Hussein Nasser to see the guarantees
+and trade-offs in motion. Watch the Jay Kreps talk to understand *why* events beat request/response
+at scale. Save the ByteByteGo Kafka/RabbitMQ deep dive for the next topic — you'll get more from the
+lab below than from a fourth video.
+</MentorNote>
+
+## 📚 Read
+
+<ResourceGrid>
+  <Resource type="article" title="What do you mean by Event-Driven?" href="https://martinfowler.com/articles/201701-event-driven.html" desc="Fowler untangles the four distinct meanings of 'event-driven' — read this first." />
+  <Resource type="doc" title="AWS: What is Event-Driven Architecture?" href="https://aws.amazon.com/what-is/eda/" desc="A clear, vendor-neutral primer on EDA concepts and benefits." />
+  <Resource type="doc" title="Event-Driven Architectures with Lambda" href="https://docs.aws.amazon.com/lambda/latest/dg/concepts-event-driven-architectures.html" desc="How producers, consumers, and DLQs wire together in practice." />
+  <Resource type="course" title="Designing Event-Driven Microservices" href="https://developer.confluent.io/courses/microservices/event-driven-architecture/" desc="Confluent's course on sagas, outbox, and choreography vs orchestration." />
+</ResourceGrid>
+
+## 🔨 Build this
+
+<Steps>
+<Step>
+**Publish and fan out an event.** Stand up a broker locally (RabbitMQ or Redis Streams via Docker).
+Have an order service publish an `OrderPlaced` event to a topic. Wire up **two** independent
+consumers — an **email** service and an **inventory** service — that both receive every event. Prove
+the producer never waits on either consumer.
+</Step>
+<Step>
+**Make consumers idempotent.** Give each `OrderPlaced` event a unique `eventId`. In each consumer,
+record processed ids and skip duplicates. Now deliberately redeliver the same message (or crash a
+consumer mid-process) and confirm no duplicate emails are sent and inventory is only decremented once.
+</Step>
+<Step>
+**Add a dead-letter queue.** Make the inventory consumer throw on a "poison" message. Configure
+bounded retries with backoff, then route the failure to a **DLQ** after N attempts. Verify the
+poison message lands in the DLQ *without* blocking the other consumers or losing the good events.
+</Step>
+<Step>
+**Observe and replay.** Add logging for queue depth / consumer lag and watch **backpressure** build
+when you throttle a consumer. Then inspect a message in the DLQ, fix the cause, and replay it back
+into the main flow. Bonus: sketch a **saga** that compensates (releases reserved stock) if payment
+later fails.
+</Step>
+</Steps>
+
+## Cheat sheet
+
+```text
+Producer        -> drops an event, never blocks on consumers
+Queue           -> one message -> one consumer in a group (work distribution)
+Topic (pub/sub) -> one event   -> every subscriber (notification)
+Stream (log)    -> durable, ordered, replayable; consumers track offsets
+
+Delivery:  at-most-once (lossy) | at-least-once (dupes) | "exactly-once" (idempotency)
+Idempotency key: stable eventId + a processed-set  -> duplicates become no-ops
+DLQ:  retries(N, backoff) exhausted -> park for inspect + alert + replay
+Ordering: only guaranteed per partition/key (e.g. per orderId)
+Saga: local step + compensating action per step (no distributed locks)
+Outbox: write event to DB in the same txn, relay to broker -> no lost events
+```
+
+## Interview signals & common pitfalls
+
+- **Signal of mastery:** you default to at-least-once delivery and reach for idempotent consumers and
+  a DLQ *without being asked*, and you can explain why exactly-once is a design property, not a broker
+  checkbox.
+- **Pitfall:** treating a queue like a synchronous RPC — waiting for a "response" defeats the entire
+  point of decoupling.
+- **Pitfall:** ignoring duplicates. Under at-least-once, a non-idempotent consumer will eventually
+  double-charge someone.
+- **Pitfall:** no DLQ, so one poison message either blocks the queue or gets retried forever, taking
+  the consumer down with it.
+- **Pitfall:** the **dual-write problem** — updating the database and publishing the event as two
+  separate steps. If one fails, they diverge. Use the **outbox pattern** to make them atomic.
+
+## Mastery checklist
+
+<Checklist id="queues-eda">
+  <Check>I can explain when to use a queue vs pub/sub vs an event stream.</Check>
+  <Check>I can articulate at-most-once, at-least-once, and exactly-once and why I design for at-least-once.</Check>
+  <Check>I make consumers idempotent using a stable event id and a processed-set.</Check>
+  <Check>I use a dead-letter queue with bounded retries and backoff for poison messages.</Check>
+  <Check>I know ordering is only guaranteed per partition/key and design keys accordingly.</Check>
+  <Check>I can describe choreography vs orchestration and when each fits.</Check>
+  <Check>I can implement a saga with compensating actions for a multi-service transaction.</Check>
+  <Check>I use the outbox pattern to avoid the dual-write problem.</Check>
+</Checklist>
+
+<Callout type="info">
+Next up in the roadmap: [Kafka & RabbitMQ](/docs/messaging/kafka-rabbitmq) — now that you understand
+the patterns, it's time to learn the two brokers you'll actually run in production and how their
+guarantees differ.
+</Callout>

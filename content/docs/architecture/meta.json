@@ -1,0 +1,11 @@
+{
+  "title": "Architecture",
+  "icon": "Building2",
+  "pages": [
+    "system-design",
+    "distributed-systems",
+    "microservices",
+    "load-balancing",
+    "scalability-reliability"
+  ]
+}

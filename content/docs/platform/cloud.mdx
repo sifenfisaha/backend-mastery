@@ -1,0 +1,182 @@
+---
+title: AWS & Azure
+description: The core cloud primitives on AWS and Azure — compute, storage, networking, IAM and managed services.
+icon: Cloud
+---
+
+## Why this matters
+
+The cloud is not "someone else's computer" — it's a giant catalog of rentable primitives you wire
+together and pay for by the hour, the gigabyte, or the request. As a senior backend engineer you
+won't just write services; you'll decide *where* they run, *how* they store data, *who* can reach
+them, and *what it costs*. AWS and Azure are the two you'll meet most often, and while the marketing
+names differ, the underlying primitives are nearly identical. Learn the mental model once and you can
+read either console — and hold your own in any architecture review.
+
+<MentorNote>
+Don't confuse *self-hosted* with *managed*. Running Postgres yourself on a VM means you own backups,
+patching, failover, and the 3am page. Using a managed database (RDS, Azure SQL) means you rent the
+same Postgres but the provider handles the boring, dangerous parts. The whole cloud value
+proposition is: **pay a bit more to stop operating undifferentiated plumbing.** Reach for managed
+first; self-host only when you have a real reason.
+</MentorNote>
+
+## Mental model
+
+Think of the cloud like renting a fully-serviced workshop instead of buying a building:
+
+- You don't buy servers — you **rent compute** by the second and give it back when idle.
+- You don't rack disks — you **rent storage** that scales to petabytes without you thinking about it.
+- You don't lay cable — you **define networks in software** (a VPC/VNet) and change them with an API call.
+- Someone else owns the roof, power, and locks — that's the **shared responsibility model**. They secure the *cloud*; you secure what you put *in* it.
+
+Two more anchors: **regions** are geographic locations (us-east-1, West Europe); each region has
+multiple **availability zones** — isolated datacenters you spread across so one failure doesn't take
+you down. And every primitive has a meter — if it's running, it's billing. Cost awareness is a
+first-class engineering skill here, not an afterthought.
+
+## Core concepts to master
+
+<Accordions type="single">
+<Accordion title="Compute: VMs, containers & serverless">
+Three rungs, increasing abstraction. **VMs** (EC2 / Azure VM) — you get a machine, you own the OS.
+**Containers** (ECS + EKS / AKS) — you ship images, the platform schedules them. **Serverless**
+(Lambda / Azure Functions) — you ship a function, the platform runs it per-request and scales to
+zero. Rule of thumb: start serverless for glue and spiky workloads, containers for real services,
+VMs only when you need full control.
+</Accordion>
+<Accordion title="Storage: object vs block">
+**Object storage** (S3 / Azure Blob) is the workhorse — infinitely scalable, cheap, HTTP-addressable
+buckets for files, backups, and static assets. It is *not* a filesystem. **Block storage** (EBS /
+Managed Disks) is a virtual disk you attach to one VM — that's where your OS and databases live. Know
+which one a workload needs; using the wrong one is a classic junior mistake.
+</Accordion>
+<Accordion title="Networking: VPC, load balancers & CDN">
+A **VPC / VNet** is your private, software-defined network — subnets, route tables, and security
+groups decide what can talk to what. Put a **load balancer** (ALB / Azure Load Balancer) in front to
+spread traffic across instances, and a **CDN** (CloudFront / Front Door) at the edge to cache and
+serve static content close to users. Default to private subnets; expose only what must be public.
+</Accordion>
+<Accordion title="Databases & managed services">
+Managed relational databases (RDS / Azure SQL) give you Postgres or MySQL without owning backups,
+patching, or failover. Beyond that sit managed queues, caches, search, and more — the same building
+blocks from earlier topics, run for you. The trade-off: less control and some lock-in, in exchange
+for far less operational burden. For most teams that's the right call.
+</Accordion>
+<Accordion title="Identity & access (IAM / Entra ID)">
+**IAM** (AWS) and **Entra ID** (Azure) control *who* can do *what*. Everything is deny-by-default;
+you grant least-privilege permissions via policies and roles. Give services **roles**, not
+long-lived keys. Getting IAM right is the difference between a secure account and a breach — it's the
+single most important thing to understand well.
+</Accordion>
+<Accordion title="Infrastructure as code (Terraform)">
+Don't click your way through the console for anything real — that's not reproducible and nobody can
+review it. Declare your infrastructure in code with **Terraform** (works across both clouds) or a
+native tool, commit it, and apply it through CI. Your VPC, databases, and IAM roles become versioned,
+peer-reviewed, and rebuildable from scratch.
+</Accordion>
+</Accordions>
+
+## 📺 Watch
+
+<VideoGrid>
+  <VideoCard id="7HKot-brXFE" title="AWS Certified Cloud Practitioner Course" channel="freeCodeCamp (ExamPro)" duration="14 hr" />
+  <VideoCard id="5abffC-K40c" title="Azure Fundamentals AZ-900 Course" channel="freeCodeCamp (ExamPro)" duration="8 hr" />
+  <VideoCard id="NPEsD6n9A_I" title="AZ-900 Full Course" channel="Adam Marczak" duration="4 hr" />
+  <VideoCard href="https://aws.amazon.com/getting-started/" title="AWS Getting Started — hands-on tutorials" channel="AWS" />
+</VideoGrid>
+
+<MentorNote title="What to actually watch">
+Pick **one** cloud and watch its cert course — the AWS Cloud Practitioner course if you're going AWS,
+or an AZ-900 course (Marczak's is tighter than the 8-hour one) if Azure. These double as certification
+prep. Do not try to learn both clouds at once; the concepts transfer, so master one deeply first, then
+skim the other's docs later.
+</MentorNote>
+
+## 📚 Read
+
+<ResourceGrid>
+  <Resource type="doc" title="AWS Cloud Essentials" href="https://aws.amazon.com/getting-started/fundamentals-overview/" desc="AWS's own overview of the core services and how they fit together." />
+  <Resource type="doc" title="AWS Documentation" href="https://docs.aws.amazon.com/" desc="The reference for every AWS service — bookmark it." />
+  <Resource type="course" title="Azure Fundamentals Certification" href="https://learn.microsoft.com/en-us/credentials/certifications/azure-fundamentals/" desc="The official AZ-900 landing page and learning path." />
+  <Resource type="doc" title="AZ-900 Study Guide" href="https://learn.microsoft.com/en-us/credentials/certifications/resources/study-guides/az-900" desc="Exactly what the Azure fundamentals exam covers." />
+  <Resource type="lab" title="AWS Free Tier Project (S3 / EC2 / Lambda)" href="https://aws.amazon.com/getting-started/" desc="Guided hands-on projects you can build on the free tier." />
+</ResourceGrid>
+
+## 🔨 Build this
+
+<Steps>
+<Step>
+**Create an account and lock it down.** Sign up for AWS (or Azure) free tier. Immediately enable MFA
+on the root/global-admin account, create a non-root IAM user for daily work, and **set a billing
+alert** so a runaway resource can't surprise you. This first hour is pure operational hygiene.
+</Step>
+<Step>
+**Host a static site on object storage.** Put a small HTML/JS site in an **S3 bucket** (or Azure
+Blob) configured for static website hosting. Note that you're serving a real website with zero
+servers — just storage and a URL.
+</Step>
+<Step>
+**Add a serverless backend.** Write a tiny **Lambda / Azure Function** that returns JSON, expose it
+over HTTP (API Gateway / Functions HTTP trigger), and call it from your static site's frontend.
+You now have a full app with no VM to patch and a bill that's effectively zero when idle.
+</Step>
+<Step>
+**Codify and tear down.** Rewrite one piece — say the bucket — as a small **Terraform** file, then
+`terraform apply` and `terraform destroy`. Deleting everything cleanly is how you avoid a
+$40 surprise, and reproducible infra is the habit that separates senior engineers from console-clickers.
+</Step>
+</Steps>
+
+## AWS vs Azure
+
+<Tabs items={["AWS", "Azure"]}>
+<Tab value="AWS">
+- **Compute:** EC2 (VMs) · ECS + EKS (containers) · Lambda (serverless)
+- **Storage:** S3 (object) · EBS (block)
+- **Networking:** VPC · ALB/NLB · CloudFront (CDN)
+- **Database:** RDS / Aurora
+- **Identity:** IAM
+- **Cert to start:** AWS Certified Cloud Practitioner
+</Tab>
+<Tab value="Azure">
+- **Compute:** Azure VM (VMs) · AKS (containers) · Azure Functions (serverless)
+- **Storage:** Blob Storage (object) · Managed Disks (block)
+- **Networking:** VNet · Azure Load Balancer · Front Door (CDN)
+- **Database:** Azure SQL
+- **Identity:** Entra ID (formerly Azure AD)
+- **Cert to start:** AZ-900 Azure Fundamentals
+</Tab>
+</Tabs>
+
+## Interview signals & common pitfalls
+
+- **Signal of mastery:** you can map a system's needs to the right primitives — "static assets on S3
+  behind CloudFront, API on Lambda, data in RDS across two AZs" — and explain the cost and failure
+  trade-offs of each choice.
+- **Pitfall:** confusing object storage with a filesystem, or attaching block storage where you needed
+  a shared bucket.
+- **Pitfall:** using long-lived access keys instead of IAM roles — the top cause of leaked-credential
+  breaches.
+- **Pitfall:** deploying to a single availability zone, then being surprised when one zone's outage
+  takes you down.
+- **Pitfall:** clicking resources into existence in the console with no Terraform, no billing alert,
+  and no way to reproduce or clean up.
+
+## Mastery checklist
+
+<Checklist id="cloud">
+  <Check>I can explain managed vs self-hosted and default to managed services with a reason to deviate.</Check>
+  <Check>I can name the AWS and Azure equivalents for compute, storage, networking, database, and identity.</Check>
+  <Check>I know when to reach for a VM, a container, or a serverless function.</Check>
+  <Check>I understand the shared responsibility model and what parts are mine to secure.</Check>
+  <Check>I design across multiple availability zones and understand regions.</Check>
+  <Check>I grant least-privilege access with IAM roles instead of long-lived keys.</Check>
+  <Check>I can stand up and tear down infrastructure with Terraform, not just the console.</Check>
+  <Check>I set billing alerts and can reason about what a design will cost.</Check>
+</Checklist>
+
+<Callout type="info">
+Next up in the roadmap: [CI/CD](/docs/platform/cicd) — now that you can provision cloud
+infrastructure, it's time to ship to it automatically, safely, and on every commit.
+</Callout>

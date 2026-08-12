@@ -1,0 +1,191 @@
+---
+title: Distributed Systems
+description: Partial failure, CAP, replication, consistency models, consensus and consistent hashing.
+icon: Globe
+---
+
+## Why this matters
+
+A single-machine program either works or crashes — clean, binary, easy to reason about. The moment
+your system spans two machines connected by a network, everything you took for granted breaks. Calls
+can succeed, fail, or *hang forever with no answer*. Nodes die mid-write. Clocks disagree. The
+network drops, delays, duplicates, and reorders your messages. Nearly every hard problem in senior
+backend work — replication lag, split-brain, "why did this write vanish", cache inconsistency,
+distributed transactions — is a distributed-systems problem in disguise. Learn the fundamentals here
+and the rest of the architecture track stops feeling like magic.
+
+<MentorNote>
+Don't confuse **a slow node with a dead node** — the whole field is hard precisely because you
+cannot tell them apart. When a request times out, you have no idea whether the other side never got
+it, got it and crashed, or did the work and the *reply* got lost. This is **partial failure**, and
+it's why "just retry" quietly corrupts data unless your operations are idempotent. Internalize this
+one uncertainty and CAP, consensus, and quorums all follow from it.
+</MentorNote>
+
+## Mental model
+
+Think of a distributed system as **a team of people in separate rooms who can only pass notes under
+the door**:
+
+- You **never** know if a note arrived — you only know if you got a reply, and silence tells you nothing.
+- Everyone's **watch shows a slightly different time**, so "who wrote last" is genuinely ambiguous — there is no global clock.
+- To agree on anything (who's the leader, what the current value is), the group must **vote**, and a
+  decision only sticks once a **majority** has seen it — that's a quorum.
+- If the doorway is blocked (a network partition), each room keeps working alone and their notes
+  diverge. Now you must choose: keep serving and risk disagreement, or stop until the doorway
+  reopens. That choice *is* the CAP theorem.
+
+Everything else — replication, sharding, Raft — is just disciplined note-passing that survives lost
+notes and blocked doorways.
+
+## Core concepts to master
+
+<Accordions type="single">
+<Accordion title="The 8 fallacies of distributed computing">
+The classic list of false assumptions that sink naive designs: the network is reliable, latency is
+zero, bandwidth is infinite, the network is secure, topology doesn't change, there's one
+administrator, transport cost is zero, and the network is homogeneous. Every one of these is false in
+production. Good distributed design starts by assuming the *opposite* of each — then adding timeouts,
+retries with backoff, and idempotency to survive it.
+</Accordion>
+<Accordion title="CAP and PACELC">
+Under a network **P**artition you must choose between **C**onsistency and **A**vailability — you
+can't have both while the network is split. But partitions are rare, so **PACELC** completes the
+picture: *else* (**E**), when the system is healthy, you still trade **L**atency against
+**C**onsistency. A system is "CP" or "AP" under partition, and "EL" or "EC" otherwise. Most real
+tuning happens in that everyday latency-vs-consistency dial, not the dramatic partition case.
+</Accordion>
+<Accordion title="Consistency models: strong, eventual, causal">
+**Strong** (linearizable): every read sees the latest write, as if there were one copy — simple to
+reason about, expensive to coordinate. **Eventual**: replicas converge *if writes stop*, but reads
+may be stale in the meantime — cheap and highly available. **Causal**: a useful middle ground that
+preserves cause-and-effect ordering (you always see a reply after the message it answers) without
+paying for full linearizability. Pick the weakest model your correctness actually needs.
+</Accordion>
+<Accordion title="Replication: leader-follower and quorums">
+**Leader-follower** (primary-replica): all writes go to one leader, which streams a replication log
+to followers. Simple, but followers lag (stale reads) and leader failure needs failover.
+**Quorum-based** (leaderless, Dynamo-style): write to `W` replicas, read from `R`, and if `W + R > N`
+every read overlaps the latest write. Tuning `W` and `R` slides you between consistency and
+availability without a single leader to lose.
+</Accordion>
+<Accordion title="Partitioning, sharding & consistent hashing">
+To scale beyond one machine you **partition** (shard) data across nodes. Naive `hash(key) % N`
+remaps *almost everything* when `N` changes — catastrophic reshuffling. **Consistent hashing** places
+nodes and keys on a ring so adding or removing a node only moves the keys in one arc, roughly `1/N`
+of them. **Virtual nodes** (many points per physical node) smooth out the load imbalance the basic
+ring suffers from.
+</Accordion>
+<Accordion title="Consensus: Raft & Paxos at a high level">
+Consensus lets a cluster agree on a single value even as nodes fail. **Raft** breaks it into
+**leader election** (a majority elects one leader per term), **log replication** (the leader appends
+entries and commits once a majority acknowledges), and **safety** (a committed entry is never lost).
+**Paxos** solves the same problem and is more general but famously harder to grasp — Raft was
+literally designed to be understandable. You rarely implement these; you *use* them (etcd, ZooKeeper,
+Consul) and must know their guarantees.
+</Accordion>
+<Accordion title="Idempotency: the retry survival kit">
+Because you can't tell a lost request from a lost reply, clients retry — and without care, retries
+double-charge cards or double-ship orders. An **idempotent** operation produces the same result no
+matter how many times it runs. Achieve it with an **idempotency key** the server records, natural
+upserts, or version checks (compare-and-set). This is the single most practical distributed-systems
+habit to build.
+</Accordion>
+</Accordions>
+
+## 📺 Watch
+
+<VideoGrid>
+  <VideoCard id="zaRkONvyGr8" title="Consistent Hashing" channel="Gaurav Sen" duration="9 min" />
+  <VideoCard id="nH4qjmP2KEE" title="Top 7 Most-Used Distributed System Patterns" channel="ByteByteGo" duration="13 min" />
+  <VideoCard id="cQP8WApzIQQ" title="MIT 6.824 Lecture 1: Introduction" channel="MIT 6.824" duration="1 hr 20 min" />
+  <VideoCard id="gA4YXUJX7t8" title="MIT 6.824 Lecture 2: RPC and Threads" channel="MIT 6.824" duration="1 hr 20 min" />
+</VideoGrid>
+
+<MentorNote title="What to actually watch">
+Start with **Gaurav Sen on Consistent Hashing** — it's short and directly powers this week's lab.
+Then watch **ByteByteGo's patterns** overview for the vocabulary. When you're ready to go deep,
+**MIT 6.824 Lecture 1** is the best free introduction to the whole field anywhere; Lecture 2 is only
+worth it once you commit to the labs below. Skip nothing here, but pace the MIT lectures over the week.
+</MentorNote>
+
+## 📚 Read
+
+<ResourceGrid>
+  <Resource type="book" title="Designing Data-Intensive Applications" href="https://dataintensive.net/" desc="The single best book on this material — replication, partitioning, consistency, consensus. Read chapters 5–9." />
+  <Resource type="paper" title="In Search of an Understandable Consensus (Raft)" href="https://raft.github.io/raft.pdf" desc="The Raft paper. Surprisingly readable — leader election and log replication done right." />
+  <Resource type="paper" title="Paxos Made Simple" href="https://lamport.azurewebsites.net/pubs/paxos-simple.pdf" desc="Lamport's own attempt to make Paxos approachable. Read it after Raft for contrast." />
+  <Resource type="article" title="Jepsen: Consistency Models" href="https://jepsen.io/consistency" desc="A precise, visual map of every consistency model and how they relate." />
+  <Resource type="lab" title="MIT 6.824 Labs (MapReduce, Raft)" href="https://pdos.csail.mit.edu/6.824/" desc="Implement a real Raft. The gold-standard hands-on distributed-systems course." />
+</ResourceGrid>
+
+## 🔨 Build this
+
+<Steps>
+<Step>
+**Build a basic hash ring.** Implement consistent hashing: hash `N` node IDs onto a ring (a sorted
+structure keyed by hash), and write a `getNode(key)` that hashes the key and walks clockwise to the
+first node. Start with 3 nodes and a few thousand keys.
+</Step>
+<Step>
+**Measure the reshuffle.** Record which node owns each key, then **add** a 4th node and **remove** one
+of the originals. Count how many keys changed owners. Compare against a plain `hash(key) % N` scheme —
+you should see roughly `1/N` movement for the ring versus almost everything moving for modulo.
+</Step>
+<Step>
+**Add virtual nodes.** Give each physical node many points on the ring (say 100–200 replicas). Re-run
+your key distribution and chart the load per physical node — it should get dramatically more even.
+Tune the replica count and watch the balance improve.
+</Step>
+<Step>
+**Simulate churn and failure.** Loop through adding and removing nodes at random, tracking total key
+movement and per-node load over time. Then "kill" a node abruptly and confirm its keys fail over to
+the next node on the ring with no full remap. This is how real caches and databases stay stable under churn.
+</Step>
+</Steps>
+
+## Cheat sheet
+
+```text
+Partial failure   → you can't distinguish slow vs dead. Assume timeouts, retry idempotently.
+CAP (partition)   → pick C or A while the network is split.
+PACELC (healthy)  → else, trade Latency vs Consistency.
+Consistency       → strong (linearizable) > causal > eventual. Pick the weakest that's correct.
+Quorum            → W + R > N  guarantees read overlaps latest write.
+Consistent hash   → adding a node moves ~1/N keys; use virtual nodes to balance load.
+Raft              → leader election + log replication + majority commit.
+Idempotency       → idempotency key / upsert / compare-and-set, so retries are safe.
+```
+
+## Interview signals & common pitfalls
+
+- **Signal of mastery:** you frame design questions around *failure modes first* — "what happens if
+  this node dies mid-write, or the network partitions here?" — and reach for quorums, idempotency
+  keys, and the right consistency model without being prompted.
+- **Pitfall:** treating a timeout as a failure and retrying a non-idempotent write, silently
+  double-applying it. The request may have succeeded; only the reply was lost.
+- **Pitfall:** relying on wall-clock timestamps to order events across machines. Clocks drift — use
+  logical clocks, version vectors, or a consensus log instead.
+- **Pitfall:** claiming a system is "both consistent and available" — under a real partition you must
+  choose one; saying otherwise signals you haven't internalized CAP.
+- **Pitfall:** sharding with `hash(key) % N`, then discovering that scaling from 4 to 5 nodes remaps
+  almost every key and melts your cache.
+
+## Mastery checklist
+
+<Checklist id="distributed-systems">
+  <Check>I can explain partial failure and why a timeout doesn't tell you whether the work happened.</Check>
+  <Check>I can state CAP precisely and extend it to PACELC's latency-vs-consistency trade-off.</Check>
+  <Check>I can compare strong, eventual, and causal consistency and pick the weakest one that's correct.</Check>
+  <Check>I can describe leader-follower vs quorum replication and the `W + R > N` rule.</Check>
+  <Check>I can implement consistent hashing with virtual nodes and reason about key movement.</Check>
+  <Check>I can explain Raft's leader election and log replication at a high level.</Check>
+  <Check>I make write operations idempotent so retries are safe.</Check>
+  <Check>I can name several of the fallacies of distributed computing and design against them.</Check>
+</Checklist>
+
+<Callout type="info">
+Next up in the roadmap: [Microservices](/docs/architecture/microservices) — now that you understand
+partial failure, consistency, and consensus, you're ready to see what happens when you split one
+system into many independently deployed services that must talk over exactly these unreliable networks.
+</Callout>

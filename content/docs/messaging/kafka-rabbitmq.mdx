@@ -1,0 +1,194 @@
+---
+title: Kafka & RabbitMQ
+description: Log streams vs message brokers — partitions, consumer groups, delivery guarantees, and when to use which.
+icon: GitBranch
+---
+
+## Why this matters
+
+Once your system stops being one service talking to one database, you need a way to move work and
+events between processes reliably. Two names dominate that conversation, and juniors constantly treat
+them as interchangeable "queues." They aren't. **Kafka is a distributed, append-only log** you
+publish events into and consumers read from at their own pace — with retention and replay.
+**RabbitMQ is a smart broker** that routes each message to the right queue and, once acknowledged,
+forgets it. Choosing the wrong one bakes a mismatch into your architecture that's painful to undo.
+Knowing exactly where the line is between them is a senior-level signal.
+
+<MentorNote>
+Don't confuse a **log** with a **queue**. RabbitMQ hands a message to a consumer, waits for an ack,
+then deletes it — the message is *consumed*. Kafka never deletes on read: it keeps events for a
+retention window, and every consumer group tracks its own **offset** into the log. In Kafka, reading
+is just moving a pointer. That single difference — destructive consume vs. replayable log — explains
+almost everything else.
+</MentorNote>
+
+## Mental model
+
+Think of two very different mail systems:
+
+- **RabbitMQ is a post office with sorting clerks.** You drop a letter at an **exchange**, the clerk
+  reads the address (**routing key**) and drops it into the right **queue**. A worker picks it up,
+  signs for it (**ack**), and the letter is gone. Great when you care about *who does this one task*.
+- **Kafka is a newspaper archive.** Every event is printed into a numbered, append-only ledger
+  (**partition**). Readers keep a bookmark (**offset**) and can re-read yesterday's edition whenever
+  they like. Great when you care about *a durable stream of facts that many teams replay*.
+
+RabbitMQ pushes work at consumers and optimizes for flexible routing. Kafka lets consumers pull from
+a retained log and optimizes for throughput and replay. Match the tool to which of those you need.
+
+## Core concepts to master
+
+<Accordions type="single">
+<Accordion title="Kafka: topics, partitions & offsets">
+A **topic** is a named stream, split into **partitions** for parallelism. Each partition is an
+ordered, append-only sequence; every message gets a monotonically increasing **offset**. Ordering is
+guaranteed *only within a partition* — never across the whole topic. Messages with the same **key**
+(e.g. `orderId`) hash to the same partition, so all events for one order stay ordered. Consumers
+commit offsets to mark how far they've read.
+</Accordion>
+<Accordion title="Kafka: consumer groups, replication & retention">
+A **consumer group** shares the work of a topic: each partition is read by exactly one consumer in
+the group, so you scale by adding partitions. Different groups read the *same* data independently.
+Partitions are **replicated** across brokers (a leader plus followers) for durability. **Retention**
+(time- or size-based) means data sticks around after being read, so a new or lagging consumer can
+**replay** from any offset. This replay-ability is Kafka's superpower.
+</Accordion>
+<Accordion title="RabbitMQ: exchanges, queues & bindings">
+Producers publish to an **exchange**, not directly to a queue. The exchange type decides routing:
+**direct** (exact routing-key match), **topic** (wildcard patterns like `order.*.eu`), **fanout**
+(broadcast to every bound queue), and **headers** (match on header attributes). A **binding** links
+an exchange to a queue with a routing rule. This routing flexibility is RabbitMQ's superpower.
+</Accordion>
+<Accordion title="RabbitMQ: acks, prefetch & DLX">
+Consumers must **ack** a message; unacked messages get redelivered if the consumer dies — that's
+your at-least-once guarantee. **Prefetch** (QoS) caps how many unacked messages a consumer holds at
+once, so one slow worker doesn't hog the queue. A **Dead Letter Exchange (DLX)** catches messages
+that are rejected, expire, or exceed a retry limit, routing them to a **dead-letter queue** for
+inspection instead of silently dropping them.
+</Accordion>
+<Accordion title="Delivery guarantees & idempotency">
+Both brokers give you **at-least-once** by default, which means duplicates *will* happen (a consumer
+processes a message, then crashes before acking/committing). Exactly-once is narrow and expensive —
+Kafka offers it only within its own transactional read-process-write. The practical answer in both
+worlds is the same: make consumers **idempotent** (dedupe on a message id or use upserts) so a
+replay or redelivery is harmless.
+</Accordion>
+<Accordion title="Throughput vs. routing: the real trade-off">
+Kafka is built for **high-throughput** sequential I/O and horizontal scale via partitions — millions
+of events, long retention, many replaying consumers. RabbitMQ is built for **rich per-message
+routing** and lower-latency task distribution, with per-message TTLs, priorities, and complex
+topologies. Kafka scales throughput; RabbitMQ scales routing complexity.
+</Accordion>
+</Accordions>
+
+## 📺 Watch
+
+<VideoGrid>
+  <VideoCard id="R873BlNVUB4" title="Apache Kafka Crash Course" channel="Hussein Nasser" duration="1 hr 15 min" />
+  <VideoCard id="heR3I3Wxgro" title="What is Kafka | Beginners Guide" channel="TechWorld with Nana" duration="35 min" />
+  <VideoCard id="Cie5v59mrTg" title="RabbitMQ Crash Course" channel="Hussein Nasser" duration="45 min" />
+  <VideoCard id="nFxjaVmFj5E" title="RabbitMQ Tutorial" channel="Amigoscode" duration="31 min" />
+</VideoGrid>
+
+<MentorNote title="What to actually watch">
+Start with Nana's "What is Kafka" for the clean mental model, then Hussein Nasser's Kafka crash
+course for the *why* behind partitions and the log. For RabbitMQ, watch either Hussein's crash course
+(deeper) or Amigoscode (faster, more hands-on) — you don't need both. Skip whichever you skimmed and
+go build the lab; feeling the two models side by side teaches more than a fourth video.
+</MentorNote>
+
+## 📚 Read
+
+<ResourceGrid>
+  <Resource type="doc" title="Apache Kafka Documentation" href="https://kafka.apache.org/documentation/" desc="The source of truth for topics, partitions, consumer groups, and delivery semantics." />
+  <Resource type="doc" title="RabbitMQ Tutorials" href="https://www.rabbitmq.com/tutorials" desc="The official step-by-step tutorials covering exchanges, routing, and acks." />
+  <Resource type="article" title="Confluent: Intro to Apache Kafka" href="https://developer.confluent.io/what-is-apache-kafka/" desc="A clear, opinionated intro to the log and event-streaming model." />
+  <Resource type="article" title="CloudAMQP: RabbitMQ for Beginners" href="https://www.cloudamqp.com/blog/part1-rabbitmq-for-beginners-what-is-rabbitmq.html" desc="Plain-English walkthrough of exchanges, queues, and bindings." />
+</ResourceGrid>
+
+## 🔨 Build this
+
+<Steps>
+<Step>
+**Stand up both brokers.** Use the Compose snippet below to run Kafka (KRaft mode, no ZooKeeper) and
+RabbitMQ (with the management UI) locally. Confirm you can reach the RabbitMQ dashboard at
+`localhost:15672` and create a Kafka topic with the CLI.
+</Step>
+<Step>
+**Build the order pipeline in Kafka.** Create an `orders` topic with **3 partitions**, keyed by
+`orderId`. Write a producer that emits `OrderPlaced` events and two consumers in the **same consumer
+group**. Watch partitions get divided between them. Add a *second* group (e.g. analytics) and prove
+it reads the same events independently. Then reset an offset and **replay** the stream.
+</Step>
+<Step>
+**Build the same pipeline in RabbitMQ.** Create a **topic exchange** `orders`, bind an `email` queue
+and an `inventory` queue with different routing keys, and publish `OrderPlaced` with a matching key.
+Set **prefetch** to 1 on the workers and require manual **acks**. Feel how routing replaces topics
+here.
+</Step>
+<Step>
+**Break RabbitMQ on purpose and add a DLQ.** Make one consumer reject (`nack`, no requeue) every
+5th message. Wire a **Dead Letter Exchange** so rejected messages land in a `orders.dlq` queue.
+Inspect the dead letters, then make the consumer **idempotent** and reprocess them safely.
+</Step>
+</Steps>
+
+## Cheat sheet
+
+```yaml
+# docker-compose.yml — Kafka (KRaft) + RabbitMQ for local dev
+services:
+  kafka:
+    image: bitnami/kafka:3.7
+    ports: ["9092:9092"]
+    environment:
+      KAFKA_CFG_NODE_ID: "0"
+      KAFKA_CFG_PROCESS_ROLES: "controller,broker"
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "0@kafka:9093"
+      KAFKA_CFG_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093"
+      KAFKA_CFG_ADVERTISED_LISTENERS: "PLAINTEXT://localhost:9092"
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports: ["5672:5672", "15672:15672"]   # broker + management UI
+```
+
+```bash
+# Kafka: create a keyed topic and watch consumer groups share partitions
+kafka-topics.sh --create --topic orders --partitions 3 --bootstrap-server localhost:9092
+kafka-console-producer.sh --topic orders --bootstrap-server localhost:9092
+kafka-console-consumer.sh --topic orders --group workers --from-beginning \
+  --bootstrap-server localhost:9092
+kafka-consumer-groups.sh --describe --group workers --bootstrap-server localhost:9092  # see lag
+```
+
+## Interview signals & common pitfalls
+
+- **Signal of mastery:** you can say *"Kafka is a replayable log with per-partition ordering; RabbitMQ
+  is a broker with rich routing and destructive consume,"* and pick correctly for a given use case
+  without hand-waving.
+- **Pitfall:** expecting global ordering in Kafka. Ordering holds only *within a partition* — key
+  your messages so related events land together.
+- **Pitfall:** treating either broker as exactly-once out of the box. It's at-least-once; design
+  **idempotent** consumers or you'll double-process on redelivery.
+- **Pitfall:** ignoring RabbitMQ **prefetch**, so one greedy consumer grabs the whole queue and
+  everything else starves.
+- **Pitfall:** using Kafka as a task queue for low-volume RPC-style work (or RabbitMQ as an event
+  store you replay for months). Each fights its design when misused.
+
+## Mastery checklist
+
+<Checklist id="kafka-rabbitmq">
+  <Check>I can explain why Kafka is a log and RabbitMQ is a broker, and what that changes.</Check>
+  <Check>I understand partitions, offsets, and that ordering is per-partition only.</Check>
+  <Check>I can describe how consumer groups share partitions and how a second group replays the same data.</Check>
+  <Check>I can route messages with direct, topic, and fanout exchanges in RabbitMQ.</Check>
+  <Check>I use acks and prefetch correctly and know how a Dead Letter Exchange works.</Check>
+  <Check>I know both brokers are at-least-once and I make consumers idempotent.</Check>
+  <Check>Given a use case, I can justify choosing Kafka vs. RabbitMQ with concrete reasons.</Check>
+</Checklist>
+
+<Callout type="info">
+Next up in the roadmap: [Kubernetes](/docs/platform/kubernetes) — now that you can run brokers and
+consumers as containers, it's time to orchestrate, scale, and self-heal them in production.
+</Callout>

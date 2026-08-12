@@ -1,0 +1,185 @@
+---
+title: Security
+description: Ship safely — the OWASP Top 10, authentication, secrets, TLS and basic threat modeling.
+icon: ShieldAlert
+---
+
+## Why this matters
+
+Every backend you build is exposed to someone who does not have your best interests at heart. A
+single SQL injection, a leaked token, an unauthenticated endpoint — any one of them can drain a
+database, dox your users, or end a company. Security is not a feature you bolt on at the end; it is a
+property of how you design, code, and deploy every service. As a senior engineer you are the person
+expected to catch the missing authorization check in code review, to know why the secret does not
+belong in the image, and to reason about what an attacker actually does. This topic gives you that
+mindset and a practical map of the threats that hit real backends.
+
+<MentorNote>
+Don't confuse **authentication** with **authorization**. Authentication answers "who are you?" —
+proving identity (a password, a token, an OIDC login). Authorization answers "what are you allowed to
+do?" — checking permissions on every request. Most real-world breaches are broken *authorization*: a
+logged-in user changing `/orders/123` to `/orders/124` and seeing someone else's data. You can
+authenticate perfectly and still be wide open.
+</MentorNote>
+
+## Mental model
+
+Think of your system like a medieval castle, not a single locked door:
+
+- **Defense in depth** — layers, not a wall. WAF, TLS, input validation, authz checks, least-privilege
+  DB users. If one layer fails, the next still holds.
+- **Least privilege** — every user, service, and token gets the *minimum* access it needs, nothing
+  more. The API's DB account should not be able to `DROP TABLE`.
+- **Never trust input** — anything from the client (body, query, headers, cookies, file uploads) is
+  hostile until validated. Validate on the way in; encode on the way out.
+- **Assume breach** — design so that when (not if) one component is compromised, the blast radius is
+  small. Secrets rotate, tokens expire, logs catch it.
+
+Security is a mindset of *hostile assumptions*. Every boundary is a place an attacker probes.
+
+## Core concepts to master
+
+<Accordions type="single">
+<Accordion title="The OWASP Top 10, practically">
+The industry's shared list of the most common web risks. The ones that bite backends hardest:
+**Broken Access Control** (missing authz — the #1 risk), **Injection** (SQL, command, LDAP — always
+use parameterized queries, never string-concatenate input), **Cryptographic Failures** (plaintext
+passwords, weak TLS, secrets in logs), **Identification & Authentication Failures** (weak sessions,
+no rate limiting on login), and **SSRF** (your server fetching an attacker-controlled URL and hitting
+internal services). Learn the list not to recite it, but to recognize each pattern in your own code.
+</Accordion>
+<Accordion title="AuthN, AuthZ, and how sessions actually work">
+Authentication proves identity; authorization enforces permissions on *every* request. **Sessions**
+store server-side state and hand the client an opaque cookie — easy to revoke. **JWTs** are
+self-contained signed tokens — stateless and scalable, but hard to revoke before expiry, so keep them
+short-lived and pair with refresh tokens. **OAuth2/OIDC** delegates auth to an identity provider
+(Google, Auth0) — OAuth2 is for authorization/access, OIDC adds an identity layer on top. Do not
+hand-roll auth; use a vetted library or provider.
+</Accordion>
+<Accordion title="Password hashing & secrets management">
+Never store passwords reversibly. Hash them with a **slow, salted** algorithm built for it —
+`bcrypt`, `argon2`, or `scrypt` — never plain SHA-256 or MD5. Secrets (DB passwords, API keys,
+signing keys) never belong in source code, in a Docker image layer, or in a committed `.env`. They
+live in environment variables injected at runtime or, better, a secrets manager (Vault, AWS Secrets
+Manager, cloud KMS) — and they get rotated.
+</Accordion>
+<Accordion title="TLS/HTTPS, input validation & output encoding">
+**TLS everywhere** — HTTPS for all traffic, including internal service-to-service where you can.
+Redirect HTTP to HTTPS, use HSTS. **Validate input** against a strict allowlist schema at the edge
+(types, lengths, formats). **Encode output** for its context so injected data can't execute —
+HTML-escape for pages, parameterize for SQL. Validation and encoding together kill most injection and
+XSS.
+</Accordion>
+<Accordion title="Rate limiting, CORS & supply-chain scanning">
+**Rate limiting** throttles brute-force, credential-stuffing, and abuse — put it on login and
+expensive endpoints. **CORS** controls which origins a browser lets call your API; configure it
+explicitly, never reflect `*` with credentials. **Supply-chain**: your dependencies are your attack
+surface. Scan them (`npm audit`, Dependabot, Snyk, Trivy for images), pin versions, and treat a
+critical CVE in a transitive dep as your problem.
+</Accordion>
+<Accordion title="Basic threat modeling">
+Before shipping a feature, ask: what are we building, what can go wrong, what do we do about it?
+Sketch the data flow, mark trust boundaries (where untrusted input crosses into trusted code), and
+walk STRIDE — Spoofing, Tampering, Repudiation, Information disclosure, Denial of service, Elevation
+of privilege. You don't need a formal doc; you need the *habit* of asking "how would I attack this?"
+</Accordion>
+</Accordions>
+
+## 📺 Watch
+
+<VideoGrid>
+  <VideoCard id="hryt-rCLJUA" title="OWASP Top 10 2021 Explained" channel="F5 DevCentral" duration="15 min" />
+  <VideoCard id="R-4_DbV1Su4" title="API Security Fundamentals Course" channel="freeCodeCamp" duration="2 hr" />
+  <VideoCard href="https://youtube.com/playlist?list=PL1GDzLoRwyVC_HFtyIHmEEThhfvaIXNsx" title="XSS Lab Walkthroughs" channel="PortSwigger" />
+  <VideoCard href="https://www.youtube.com/c/PortSwiggerTV" title="PortSwigger — Web Security channel" channel="PortSwigger" />
+</VideoGrid>
+
+<MentorNote title="What to actually watch">
+Start with the F5 DevCentral OWASP Top 10 walkthrough — 15 minutes gives you the whole threat map.
+Then do the freeCodeCamp API Security course to see the risks in real endpoints. The PortSwigger
+playlist and channel are best watched *alongside* the labs in "Build this" — watch a walkthrough, then
+try the lab yourself.
+</MentorNote>
+
+## 📚 Read
+
+<ResourceGrid>
+  <Resource type="doc" title="OWASP Top 10:2021" href="https://owasp.org/Top10/2021/" desc="The canonical list of the most critical web application risks — read every entry." />
+  <Resource type="doc" title="OWASP Cheat Sheet Series" href="https://cheatsheetseries.owasp.org/" desc="Concise, practical how-tos for auth, sessions, input validation, and more." />
+  <Resource type="article" title="OWASP API Security Top 10" href="https://www.freecodecamp.org/news/owasp-api-security-top-10-secure-your-apis/" desc="The API-specific risks (BOLA, mass assignment) explained clearly." />
+  <Resource type="lab" title="PortSwigger Web Security Academy" href="https://portswigger.net/web-security" desc="Free, hands-on labs where you actually exploit real vulnerabilities." />
+</ResourceGrid>
+
+## 🔨 Build this
+
+<Steps>
+<Step>
+**Run your app through the OWASP Top 10.** Take a real API of yours and audit it against each of the
+Top 10. For each: is it exploitable? Write down what you find — a missing authz check, a
+string-concatenated query, a `*` CORS header. Be honest; you will find something.
+</Step>
+<Step>
+**Fix the real issues.** Parameterize every query. Add an authorization check to each endpoint that
+touches user-owned data — try changing an ID in a request and confirm you get a 403. Move any secret
+out of code into an env var or secrets manager. Swap any weak password hashing for `bcrypt` or
+`argon2`.
+</Step>
+<Step>
+**Harden the edges.** Add strict input validation (schema-based) at the boundary, rate-limit your
+login endpoint, lock CORS to known origins, and enforce HTTPS with HSTS. Run `npm audit` (or your
+ecosystem's equivalent) and a container scan with Trivy, then patch the critical findings.
+</Step>
+<Step>
+**Attack something on purpose.** Work through the PortSwigger Web Security Academy labs on SQL
+injection, access control, and SSRF. Exploiting a vulnerability by hand is the fastest way to
+understand why the defense matters — you'll never write a naive query again.
+</Step>
+</Steps>
+
+## Cheat sheet
+
+```bash
+# Dependency & image scanning
+npm audit --production            # flag known-vulnerable dependencies
+trivy image myapp:1.0             # scan a container image for CVEs
+
+# Never in code — secrets from env at runtime
+export DB_PASSWORD="$(vault kv get -field=pw secret/db)"
+
+# Generate a strong random signing key
+openssl rand -base64 48
+
+# Redirect all HTTP to HTTPS (nginx)
+# return 301 https://$host$request_uri;
+```
+
+## Interview signals & common pitfalls
+
+- **Signal of mastery:** you instinctively reach for parameterized queries, check authorization on
+  *every* resource access, and can walk a threat model of a feature out loud without prompting.
+- **Pitfall:** confusing authentication with authorization — building solid login while leaving
+  endpoints that never check whether *this* user owns *that* resource.
+- **Pitfall:** hashing passwords with a fast general-purpose hash (SHA-256, MD5) instead of a slow,
+  salted `bcrypt`/`argon2`.
+- **Pitfall:** baking secrets into code, images, or committed `.env` files — they live forever in git
+  and layer history.
+- **Pitfall:** trusting input because it "comes from our frontend." The frontend is just another
+  client an attacker can bypass entirely.
+
+## Mastery checklist
+
+<Checklist id="security">
+  <Check>I can explain the difference between authentication and authorization and enforce authz on every request.</Check>
+  <Check>I can name the OWASP Top 10 and recognize each pattern in real code.</Check>
+  <Check>I always use parameterized queries and never concatenate user input into a query.</Check>
+  <Check>I hash passwords with bcrypt or argon2 and know why fast hashes are wrong.</Check>
+  <Check>I keep secrets out of code and images, using env vars or a secrets manager, and rotate them.</Check>
+  <Check>I enforce TLS everywhere, validate input at the edge, and encode output for its context.</Check>
+  <Check>I apply rate limiting, lock down CORS, and scan dependencies and images for known CVEs.</Check>
+  <Check>I can threat-model a feature — trust boundaries, what can go wrong, and mitigations.</Check>
+</Checklist>
+
+<Callout type="info">
+Next up in the roadmap: [Testing](/docs/quality/testing) — security fixes only stick when you have
+tests that prove the vulnerability is closed and stays closed.
+</Callout>

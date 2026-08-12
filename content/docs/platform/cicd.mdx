@@ -1,0 +1,214 @@
+---
+title: CI/CD
+description: Automated pipelines that test, build and deploy safely — plus GitOps and progressive delivery.
+icon: RefreshCw
+---
+
+## Why this matters
+
+Shipping by hand is where careers stall. Manual "build it, SSH in, copy the files, restart the
+service" works until the day it doesn't — and then it fails at 2am, unreproducibly, with no audit
+trail. A pipeline turns every push into a repeatable, inspectable machine: it tests your code, builds
+one artifact, scans it, and rolls it out safely — the same way, every time. Senior engineers are
+judged less on the code they type and more on the confidence with which their team ships. That
+confidence is the pipeline. Everything you've learned so far — Docker images, Kubernetes, testing —
+only pays off once a pipeline stitches them into a push-button release.
+
+<MentorNote>
+Don't blur the three C's. **Continuous Integration** is merging to trunk often and proving it works
+with automated tests on every push. **Continuous Delivery** means every green build is *deployable*
+to production — but a human clicks the button. **Continuous Deployment** removes even that button:
+green means live. Most teams do CI plus Delivery and call it "CI/CD" — knowing the difference is a
+senior signal.
+</MentorNote>
+
+## Mental model
+
+Think of a pipeline as a **factory assembly line** for your software:
+
+- Each **stage** is a station — lint, test, build, scan, deploy — and work moves down the line.
+- If any station rejects the part, the line **stops** and the part never ships. Fast feedback means
+  the reject happens at the *cheapest* station (lint), not the most expensive one (production).
+- You **build the part once** at the build station and stamp it with a version. That exact same
+  stamped part is what gets inspected and installed — you never re-manufacture a different part for
+  production.
+- **Promotion** is moving that one stamped artifact from the staging warehouse to the production
+  warehouse. Same artifact, different environment config.
+
+Build once, promote the same artifact everywhere. The image that passed your tests in staging is the
+*byte-for-byte identical image* you run in production — only the environment variables and secrets
+change.
+
+## Core concepts to master
+
+<Accordions type="single">
+<Accordion title="CI vs Delivery vs Deployment">
+**CI** is about integration: short-lived branches, frequent merges to trunk, and an automated build
+that runs your test suite on every commit so broken code is caught in minutes. **Delivery** keeps
+every green build production-ready and lets a human trigger the release. **Deployment** automates the
+release too. The prerequisite for all three is a fast, trustworthy test suite — without it, "green"
+means nothing.
+</Accordion>
+<Accordion title="Pipeline stages: lint → test → build → scan → deploy">
+Order stages cheapest-and-fastest-first so failures surface early: **lint/format** (seconds),
+**unit tests** (fast), **build the artifact/image** (once), **scan** the image for CVEs and the code
+for secrets, then **deploy**. Run independent stages in parallel where you can, but never let a later
+stage run if an earlier one failed. This is the "fail fast" principle — the earlier you catch a
+problem, the cheaper it is.
+</Accordion>
+<Accordion title="Build once, promote the artifact">
+Compile and package **exactly once**, tag the image immutably (e.g. the git SHA), push it to a
+registry, and then *promote that same image* through dev → staging → prod. Never rebuild per
+environment — a rebuild can pull different dependency versions and give you an artifact you never
+tested. Config and secrets are injected at deploy time, not baked in. This is the single most
+important discipline in the whole topic.
+</Accordion>
+<Accordion title="Trunk-based development & fast feedback">
+Long-lived feature branches drift and produce painful merges. **Trunk-based development** keeps
+everyone merging small changes into `main` at least daily, hidden behind **feature flags** if
+incomplete. It only works with a fast pipeline: if CI takes 40 minutes, people batch changes and
+you're back to big-bang merges. Optimize for feedback speed — cache dependencies, parallelize, keep
+the critical path short.
+</Accordion>
+<Accordion title="Secrets in pipelines">
+Never hard-code credentials in workflow files or bake them into images — they live forever in git
+history and layer history. Use your platform's secret store (GitHub Actions **encrypted secrets** /
+**OIDC** federation, GitLab **CI/CD variables**) and prefer short-lived, scoped tokens over
+long-lived keys. Scope secrets to the environments that need them, and scan every commit for
+accidentally committed keys.
+</Accordion>
+<Accordion title="Deployment strategies & rollbacks">
+**Rolling** replaces instances a few at a time (default, zero-downtime, slow to fully roll back).
+**Blue-green** runs two identical environments and flips traffic — instant rollback by flipping back.
+**Canary** sends a small percentage of traffic to the new version and watches metrics before ramping
+up. **Feature flags** decouple deploy from release: ship the code dark, turn it on for 1% of users.
+A rollback should always be a fast, boring, well-rehearsed operation — because you *will* need it.
+</Accordion>
+</Accordions>
+
+## 📺 Watch
+
+<VideoGrid>
+  <VideoCard id="scEDHsr3APg" title="DevOps CI/CD in 100 Seconds" channel="Fireship" duration="2 min" />
+  <VideoCard id="R8_veQiYBjI" title="GitHub Actions Tutorial (CI/CD with Docker)" channel="TechWorld with Nana" duration="32 min" />
+  <VideoCard id="qP8kir2GUgo" title="GitLab CI CD Crash Course" channel="TechWorld with Nana" duration="1 hr 9 min" />
+  <VideoCard id="Tz7FsunBbfQ" title="GitHub Actions Certification Full Course" channel="freeCodeCamp" duration="3 hr" />
+</VideoGrid>
+
+<MentorNote title="What to actually watch">
+Start with Fireship for the 2-minute mental model, then do Nana's GitHub Actions tutorial — it maps
+almost 1:1 onto the lab below. Watch the GitLab crash course only if your job uses GitLab; the
+concepts transfer, the YAML differs. Save the 3-hour freeCodeCamp course for reference — you'll learn
+more from building the pipeline than from watching a fourth video.
+</MentorNote>
+
+## 📚 Read
+
+<ResourceGrid>
+  <Resource type="doc" title="GitHub Actions docs" href="https://docs.github.com/en/actions" desc="The reference for workflows, jobs, runners, secrets and reusable actions." />
+  <Resource type="doc" title="GitLab CI/CD docs" href="https://docs.gitlab.com/ci/" desc="Pipelines, stages, environments and variables the GitLab way." />
+  <Resource type="doc" title="Argo CD: Getting Started" href="https://argo-cd.readthedocs.io/en/stable/getting_started/" desc="The canonical GitOps controller — declarative, Git-driven Kubernetes deploys." />
+  <Resource type="article" title="CI/CD Handbook (freeCodeCamp)" href="https://www.freecodecamp.org/news/learn-continuous-integration-delivery-and-deployment/" desc="A clear, opinionated walk-through of the whole CI/CD landscape." />
+  <Resource type="lab" title="ArgoCD Killercoda scenarios" href="https://killercoda.com/mabusaa/course/argocd-endusers-scenarios" desc="Hands-on GitOps deployment exercises in a free browser sandbox." />
+</ResourceGrid>
+
+## 🔨 Build this
+
+<Steps>
+<Step>
+**Get CI green.** In a repo with a Dockerfile (reuse one from the Docker chapter), add a GitHub
+Actions workflow at `.github/workflows/ci.yml` that runs on every push: check out the code, install
+dependencies (with caching), and run your linter and test suite. Break a test on purpose and confirm
+the run goes red and blocks the merge.
+</Step>
+<Step>
+**Build the image once.** Add a `build` job that runs only after tests pass. Use `docker/build-push-action`
+to build your image, tag it with the git SHA (`ghcr.io/you/app:${{ github.sha }}`), and push it to
+GitHub Container Registry. Store the registry credentials as an encrypted secret — never in the YAML.
+</Step>
+<Step>
+**Scan then deploy.** Add a `scan` step (Trivy on the built image) that fails on high-severity CVEs.
+Then add a `deploy` job that pulls that *same* tagged image and deploys it — to a small VM over SSH,
+or `kubectl set image` against a cluster. Do not rebuild; promote the exact artifact you just tested.
+</Step>
+<Step>
+**Add an environment gate and a rollback.** Configure a `production` environment with a required
+reviewer so deploys need a click (Continuous Delivery). Then rehearse a rollback: redeploy the
+previous SHA and time how long it takes. Bonus: introduce Argo CD and let it sync your manifests from
+Git instead of pushing from the pipeline (GitOps).
+</Step>
+</Steps>
+
+## Cheat sheet
+
+```yaml
+# .github/workflows/ci.yml — test → build image → deploy
+name: ci
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+
+  build-and-deploy:
+    needs: test              # only runs if tests pass
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write        # push to GHCR
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ github.sha }}  # build once, immutable tag
+      - name: deploy
+        run: echo "kubectl set image deploy/app app=ghcr.io/${{ github.repository }}:${{ github.sha }}"
+```
+
+## Interview signals & common pitfalls
+
+- **Signal of mastery:** you can explain "build once, promote the same artifact," why a rebuild per
+  environment is a bug, and when you'd reach for canary versus blue-green versus a feature flag.
+- **Pitfall:** rebuilding the image for each environment — you ship an artifact you never tested.
+- **Pitfall:** treating a slow pipeline as acceptable. Slow CI silently pushes teams back toward big
+  branches and manual deploys.
+- **Pitfall:** hard-coding secrets in workflow YAML or baking them into images instead of using
+  encrypted secrets or OIDC.
+- **Pitfall:** having no rehearsed rollback. If rolling back is scary and untested, your deploys are
+  a gamble, not a process.
+
+## Mastery checklist
+
+<Checklist id="cicd">
+  <Check>I can explain the difference between continuous integration, delivery, and deployment.</Check>
+  <Check>I can order pipeline stages (lint → test → build → scan → deploy) and explain fail-fast.</Check>
+  <Check>I build an artifact once and promote that same image across environments.</Check>
+  <Check>I write a GitHub Actions workflow that tests, builds a Docker image, and deploys.</Check>
+  <Check>I manage secrets with encrypted stores or OIDC, never hard-coded in YAML or images.</Check>
+  <Check>I can contrast rolling, blue-green, canary, and feature-flag deployments.</Check>
+  <Check>I understand GitOps (Argo CD) and can deploy by syncing manifests from Git.</Check>
+  <Check>I have a fast, rehearsed rollback for when a deploy goes wrong.</Check>
+</Checklist>
+
+<Callout type="info">
+Next up in the roadmap: [Observability](/docs/platform/observability) — a pipeline can ship in
+seconds, so you need metrics, logs, and traces to know whether what you just shipped is actually
+healthy.
+</Callout>

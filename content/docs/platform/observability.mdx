@@ -1,0 +1,189 @@
+---
+title: Observability
+description: Know what your system is doing — logs, metrics, traces, dashboards, alerting and SLOs.
+icon: Activity
+---
+
+## Why this matters
+
+When production breaks at 2 a.m., the winners aren't the people who guess fastest — they're the ones
+whose systems can *answer questions*. Observability is the difference between "the site is slow, I
+have no idea why" and "checkout p99 latency spiked because the payments dependency is timing out, and
+here's the exact trace." Every topic before this — containers, Kubernetes, queues, microservices —
+adds moving parts you can no longer hold in your head. Without logs, metrics, and traces wired in
+from day one, a distributed system is a black box you poke and pray at. Senior engineers instrument
+first and debug with data, not vibes.
+
+<MentorNote>
+Don't confuse monitoring with observability. **Monitoring** answers questions you already knew to
+ask — "is CPU above 80 percent?" — with dashboards and alerts you set up in advance. **Observability**
+is a property of the system: can you ask *new* questions about its internal state from the outside,
+without shipping new code? Monitoring tells you *that* something is wrong; observability lets you
+figure out *why* when the failure is one you never anticipated.
+</MentorNote>
+
+## Mental model
+
+Think of observability as the instrument panel and flight recorder of an aircraft:
+
+- **Logs** are the flight recorder's transcript — discrete, timestamped events ("engine 2 restarted").
+  Rich detail, but expensive to store and query at scale.
+- **Metrics** are the gauges — numbers aggregated over time (altitude, fuel, RPM). Cheap, fast, great
+  for dashboards and alerts, but they can't tell you about one specific flight.
+- **Traces** are the route map for a single journey — how one request travelled through every service,
+  and where it spent its time.
+
+These are the **three pillars**. The magic is *correlation*: a **correlation ID** (a request/trace ID
+threaded through every log line, metric label, and span) lets you jump from "this metric spiked" to
+"these logs" to "this exact trace" in seconds. Instrumentation without correlation is three
+disconnected haystacks.
+
+## Core concepts to master
+
+<Accordions type="single">
+<Accordion title="The three pillars: logs, metrics, traces">
+**Structured logs** (JSON, not free text) so you can query by field. **Metrics** are numeric time
+series — counters, gauges, histograms — cheap to aggregate. **Distributed traces** follow one request
+across service boundaries as a tree of **spans**. Use each for what it's good at: metrics to *detect*,
+traces to *localize*, logs to *explain*. Thread a correlation/trace ID through all three so you can
+pivot between them.
+</Accordion>
+<Accordion title="RED and USE methods">
+Two recipes for *what* to measure. **RED** (for request-driven services): **R**ate, **E**rrors,
+**D**uration — the three numbers that describe user-facing health. **USE** (for resources like CPU,
+disk, queues): **U**tilization, **S**aturation, **E**rrors. Start every new service with a RED
+dashboard and you'll catch most problems before users complain.
+</Accordion>
+<Accordion title="Prometheus: pull model, PromQL, exporters">
+Prometheus **scrapes** (pulls) a `/metrics` endpoint from each target on an interval — no agent
+pushing data out. Apps expose metrics directly or via an **exporter** (node_exporter for hosts,
+postgres_exporter, etc.). You query with **PromQL**: `rate(http_requests_total[5m])`,
+`histogram_quantile(0.99, ...)`. The pull model makes "is this target up?" a first-class signal and
+keeps service discovery simple in Kubernetes.
+</Accordion>
+<Accordion title="OpenTelemetry: vendor-neutral instrumentation">
+**OpenTelemetry (OTel)** is the industry-standard, vendor-neutral way to generate logs, metrics, and
+traces. You instrument once against the OTel API/SDK, run the **OTel Collector**, and export to
+whatever backend you like (Prometheus, Grafana Tempo, Jaeger, a paid vendor) — swapping backends
+without touching app code. Auto-instrumentation covers most popular frameworks with near-zero effort.
+</Accordion>
+<Accordion title="Alerting: Alertmanager, good vs noisy alerts">
+Prometheus fires alerts; **Alertmanager** routes, groups, silences, and deduplicates them. A *good*
+alert is **actionable, symptom-based, and urgent** — it pages a human because a user is being hurt
+*right now* ("checkout error rate over 5 percent"). A *noisy* alert fires on a cause nobody can act on
+at 3 a.m. ("CPU at 85 percent") and trains people to ignore the pager. Alert on symptoms (SLO burn),
+not on every twitch of a resource.
+</Accordion>
+<Accordion title="SLIs, SLOs & error budgets">
+An **SLI** is a measured indicator (e.g. the fraction of requests served under 300ms). An **SLO** is
+the target for it (99.9 percent over 30 days). The gap between your SLO and 100 percent is your
+**error budget** — the amount of failure you're *allowed*. Spend it on shipping features; if you burn
+it too fast, freeze releases and fix reliability. SLOs turn "how reliable should we be?" from an
+argument into a number.
+</Accordion>
+</Accordions>
+
+## 📺 Watch
+
+<VideoGrid>
+  <VideoCard id="h4Sl21AKiDg" title="How Prometheus Monitoring works" channel="TechWorld with Nana" duration="22 min" />
+  <VideoCard id="Xmg8APTINOk" title="Prometheus & Grafana — getting started" channel="Grafana" duration="35 min" />
+  <VideoCard id="r8UvWSX3KA8" title="OpenTelemetry Course" channel="freeCodeCamp" duration="1 hr" />
+  <VideoCard id="owMtlMDLbzE" title="Using OpenTelemetry with Honeycomb" channel="Honeycomb" duration="25 min" />
+</VideoGrid>
+
+<MentorNote title="What to actually watch">
+Start with Nana's "How Prometheus Monitoring works" for the pull model and core concepts, then the
+Grafana getting-started video to see dashboards come alive — those two get you to the lab. Save the
+OpenTelemetry course for when you want vendor-neutral tracing; skip the Honeycomb one unless you're
+specifically evaluating a hosted backend. You'll learn more from building the lab than from a fourth
+video.
+</MentorNote>
+
+## 📚 Read
+
+<ResourceGrid>
+  <Resource type="doc" title="Prometheus: Getting Started" href="https://prometheus.io/docs/prometheus/latest/getting_started/" desc="Scrape your first target and write your first PromQL query." />
+  <Resource type="doc" title="OpenTelemetry Docs" href="https://opentelemetry.io/docs/" desc="The vendor-neutral standard for logs, metrics, and traces." />
+  <Resource type="doc" title="Grafana Docs" href="https://grafana.com/docs/" desc="Build dashboards and wire up data sources and alerts." />
+  <Resource type="book" title="Google SRE Book — Monitoring" href="https://sre.google/sre-book/table-of-contents/" desc="The canonical source on SLIs, SLOs, error budgets, and alerting philosophy." />
+  <Resource type="lab" title="Grafana Fundamentals" href="https://grafana.com/tutorials/grafana-fundamentals/" desc="Hands-on: instrument a sample app and visualize it in Grafana." />
+</ResourceGrid>
+
+## 🔨 Build this
+
+<Steps>
+<Step>
+**Instrument a sample app with metrics.** Take a small HTTP service and add a Prometheus client
+library. Expose a `/metrics` endpoint with a RED-style set: a request **counter**
+(`http_requests_total` labelled by route and status) and a latency **histogram**
+(`http_request_duration_seconds`). Hit the endpoints and confirm the numbers move.
+</Step>
+<Step>
+**Scrape it with Prometheus.** Run Prometheus (Docker is easiest) with a `prometheus.yml` scrape job
+pointing at your app. Open the Prometheus UI and write PromQL: `rate(http_requests_total[5m])` and a
+p99 with `histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))`.
+</Step>
+<Step>
+**Visualize in Grafana.** Add Prometheus as a Grafana data source and build a RED dashboard — one
+panel each for request rate, error rate, and p99 duration. Generate some load and some errors, and
+watch the panels react in real time.
+</Step>
+<Step>
+**Add an alert.** Write a Prometheus alerting rule (e.g. error rate over 5 percent for 5 minutes),
+wire up Alertmanager, and trigger it deliberately by forcing errors. Confirm it fires *and* resolves.
+Bonus: make it a symptom-based SLO burn alert instead of a raw threshold.
+</Step>
+</Steps>
+
+## Cheat sheet
+
+```text
+# request rate per second, last 5 minutes (PromQL)
+rate(http_requests_total[5m])
+
+# error ratio (5xx as a fraction of all requests)
+sum(rate(http_requests_total{status=~"5.."}[5m]))
+  / sum(rate(http_requests_total[5m]))
+
+# p99 latency from a histogram
+histogram_quantile(0.99,
+  sum(rate(http_request_duration_seconds_bucket[5m])) by (le))
+
+# is the target being scraped?
+up{job="my-app"}
+```
+
+## Interview signals & common pitfalls
+
+- **Signal of mastery:** you can explain when to reach for a metric vs a log vs a trace, and you
+  describe SLOs and error budgets as a way to *negotiate* reliability against feature velocity — not
+  as a vanity dashboard.
+- **Pitfall:** high-**cardinality** labels. Putting a user ID, email, or request ID in a Prometheus
+  label explodes the number of time series and can take your monitoring down. Keep labels
+  low-cardinality; put the high-cardinality detail in logs and traces.
+- **Pitfall:** alerting on causes instead of symptoms. A page for "CPU at 85 percent" is noise; a page
+  for "checkout error rate above SLO" is signal. Noisy alerts get muted, and muted alerts miss real
+  outages.
+- **Pitfall:** unstructured, free-text logs you can't query, and no correlation ID — so you can never
+  join a spiking metric to the logs and trace that explain it.
+- **Pitfall:** treating 100 percent uptime as the goal. Without an error budget you have no principled
+  way to decide when to ship vs when to stabilize.
+
+## Mastery checklist
+
+<Checklist id="observability">
+  <Check>I can explain the difference between monitoring and observability.</Check>
+  <Check>I know the three pillars and when to use logs vs metrics vs traces.</Check>
+  <Check>I can instrument a service and expose a RED-style `/metrics` endpoint.</Check>
+  <Check>I can configure Prometheus to scrape a target and write PromQL queries.</Check>
+  <Check>I can build a Grafana dashboard and wire up an Alertmanager alert.</Check>
+  <Check>I understand OpenTelemetry and why vendor-neutral instrumentation matters.</Check>
+  <Check>I can define SLIs, SLOs, and error budgets and reason about alert quality.</Check>
+  <Check>I know why high-cardinality labels are dangerous and how to avoid them.</Check>
+</Checklist>
+
+<Callout type="info">
+Next up in the roadmap: [Security](/docs/quality/security) — once you can see what your system is
+doing, it's time to make sure attackers can't make it do the wrong thing.
+</Callout>

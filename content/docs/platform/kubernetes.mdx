@@ -1,0 +1,209 @@
+---
+title: Kubernetes
+description: Run containers in production — pods, deployments, services, ingress, config and autoscaling.
+icon: Hexagon
+---
+
+## Why this matters
+
+Docker gives you one container. Production gives you hundreds — across many machines, restarting on
+crash, rolling out new versions with zero downtime, scaling up under load and back down at night.
+Doing that by hand is a full-time job you'll do badly. Kubernetes is the industry-standard
+**orchestrator**: you declare the state you want ("run 5 copies of this image, expose it on port 80,
+keep them healthy") and it continuously makes reality match. Nearly every serious backend role
+touches Kubernetes, and the mental shift from imperative ("start this container") to declarative
+("this is what should be true") is one of the most senior habits you can build.
+
+<MentorNote>
+Don't confuse Kubernetes with Docker. Docker builds and runs a single container on one host.
+Kubernetes *schedules* many containers across a fleet of hosts and keeps them alive. Kubernetes is
+not a replacement for Docker — it runs the images Docker builds. And you almost never create a bare
+Pod by hand: you declare a **Deployment**, and it manages Pods for you.
+</MentorNote>
+
+## Mental model
+
+Think of Kubernetes as an air-traffic control system for your containers:
+
+- The **control plane** is the tower — it decides what runs where and never lands a plane itself.
+  Inside it: the **API server** (every request goes through it), **etcd** (the source-of-truth
+  database of cluster state), the **scheduler** (picks a node for each Pod), and controllers (the
+  reconcile loops that fix drift).
+- **Nodes** are the runways — the worker machines that actually run your containers. Each runs a
+  **kubelet** (the agent that talks to the tower and starts Pods) and a container runtime.
+- You file a **flight plan** (a YAML manifest) describing the desired state. You never fly the plane
+  manually.
+
+The whole system is a **reconciliation loop**: desired state versus actual state, forever. Kill a
+Pod and the controller notices the gap and starts a new one. That self-healing *is* Kubernetes.
+
+## Core concepts to master
+
+<Accordions type="single">
+<Accordion title="Pods, ReplicaSets & Deployments">
+A **Pod** is the smallest deployable unit — one or more tightly-coupled containers sharing a network
+and storage. You rarely make Pods directly. A **ReplicaSet** keeps N identical Pods running. A
+**Deployment** owns a ReplicaSet and adds rolling updates and rollbacks — this is what you actually
+write. Change the image in a Deployment and it spins up new Pods, drains old ones, and can roll back
+if they fail.
+</Accordion>
+<Accordion title="Services: ClusterIP, NodePort & LoadBalancer">
+Pods are ephemeral and get new IPs constantly, so you never talk to a Pod directly. A **Service** is
+a stable virtual IP and DNS name in front of a set of Pods (chosen by label selector).
+**ClusterIP** (default) is reachable only inside the cluster. **NodePort** opens a port on every
+node. **LoadBalancer** asks the cloud for an external load balancer. The Service load-balances
+across the healthy Pods behind it.
+</Accordion>
+<Accordion title="Ingress & routing">
+A `LoadBalancer` per service gets expensive fast. **Ingress** is a single HTTP(S) entry point that
+routes by host and path (`api.example.com` to one Service, `/admin` to another) and terminates TLS.
+It needs an **ingress controller** (NGINX, Traefik) running in the cluster to do the actual routing.
+Think of it as a shared reverse proxy managed declaratively.
+</Accordion>
+<Accordion title="Config, Secrets & Namespaces">
+Keep config out of your image. A **ConfigMap** holds non-sensitive key/values (feature flags, URLs);
+a **Secret** holds sensitive ones (passwords, tokens — base64-encoded, so add real encryption at
+rest). Mount either as env vars or files. A **Namespace** partitions one cluster into isolated
+virtual clusters (`dev`, `staging`, `team-a`) with their own quotas and access control.
+</Accordion>
+<Accordion title="Storage: Volumes & PVCs">
+A container's filesystem dies with the Pod. A **Volume** outlives the container within a Pod. For
+data that must survive Pod rescheduling, use a **PersistentVolumeClaim (PVC)** — you request "10Gi
+of fast storage" and Kubernetes binds it to a **PersistentVolume** provisioned by the cluster. This
+is how you run stateful workloads like a database.
+</Accordion>
+<Accordion title="Health, resources & autoscaling">
+Give the scheduler **resource requests** (what a Pod needs to be placed) and **limits** (the ceiling
+before it's throttled or killed). Add a **liveness probe** (restart me if I'm wedged) and a
+**readiness probe** (don't send traffic until I'm ready). Then a **HorizontalPodAutoscaler (HPA)**
+watches CPU/memory and adds or removes Pods automatically — the payoff of doing requests and probes
+right.
+</Accordion>
+</Accordions>
+
+## 📺 Watch
+
+<VideoGrid>
+  <VideoCard id="PziYflu8cB8" title="Kubernetes Explained in 100 Seconds" channel="Fireship" duration="2 min" />
+  <VideoCard id="1Lu1F94exhU" title="Kubernetes Tutorial for Beginners" channel="TechWorld with Nana" duration="1 hr" />
+  <VideoCard id="7bA0gTroJjw" title="you need to learn Kubernetes RIGHT NOW!!" channel="NetworkChuck" duration="30 min" />
+  <VideoCard id="d6WC5n9G_sM" title="Kubernetes Course — Full Beginners Tutorial" channel="freeCodeCamp" duration="2.5 hr" />
+</VideoGrid>
+
+<MentorNote title="What to actually watch">
+Start with Fireship for the 2-minute picture. Then do Nana's 1-hour tutorial — it's the best
+single-sitting explanation of the core objects and maps directly onto the lab below. Save
+NetworkChuck and the freeCodeCamp deep-dive for after you've deployed something yourself; watching a
+fourth video teaches you far less than breaking your own cluster.
+</MentorNote>
+
+## 📚 Read
+
+<ResourceGrid>
+  <Resource type="doc" title="Kubernetes Documentation" href="https://kubernetes.io/docs/home/" desc="The canonical reference — bookmark it." />
+  <Resource type="doc" title="Kubernetes Concepts" href="https://kubernetes.io/docs/concepts/" desc="The vocabulary: Pods, Services, controllers and how they fit." />
+  <Resource type="article" title="The Kubernetes Handbook" href="https://www.freecodecamp.org/news/the-kubernetes-handbook/" desc="A long, practical, free walkthrough from freeCodeCamp." />
+  <Resource type="lab" title="Killercoda Kubernetes Playground" href="https://killercoda.com/playgrounds/scenario/kubernetes" desc="A free in-browser cluster — no local install." />
+</ResourceGrid>
+
+## 🔨 Build this
+
+<Steps>
+<Step>
+**Spin up a local cluster and deploy.** Install `kind` (or `minikube`) and `kubectl`, then create a
+cluster. Take the container image you built in the Docker topic and write a `Deployment` manifest
+with `replicas: 3`. Apply it with `kubectl apply -f deployment.yaml` and watch the Pods come up with
+`kubectl get pods -w`.
+</Step>
+<Step>
+**Expose it with a Service.** Add a `Service` of type `ClusterIP` selecting your Pods' labels.
+`kubectl port-forward` to it and confirm traffic load-balances across all three Pods (log the Pod
+name in your app to see it round-robin). Then delete a Pod and watch the Deployment recreate it —
+that's self-healing.
+</Step>
+<Step>
+**Add Ingress and a rolling update.** Enable an ingress controller (NGINX), add an `Ingress` routing
+a hostname to your Service, and hit it in the browser. Now change the image tag and re-apply — watch
+`kubectl rollout status` do a zero-downtime rolling update. Break the new version and practice
+`kubectl rollout undo`.
+</Step>
+<Step>
+**Add probes, limits and an HPA.** Add liveness and readiness probes plus resource requests/limits
+to your Deployment. Create a `HorizontalPodAutoscaler` targeting 50% CPU, then hammer the app with a
+load generator and watch Pods scale out with `kubectl get hpa -w`, then scale back in when the load
+stops.
+</Step>
+</Steps>
+
+## Cheat sheet
+
+```bash
+kubectl apply -f deploy.yaml          # create/update resources from a manifest
+kubectl get pods -o wide              # list Pods (with node & IP)
+kubectl get deploy,svc,ingress        # see the whole app at a glance
+kubectl describe pod <name>           # events & why a Pod won't start
+kubectl logs -f <pod>                 # follow a Pod's logs
+kubectl exec -it <pod> -- sh          # shell into a running container
+kubectl rollout status deploy/<name>  # watch a rolling update
+kubectl rollout undo deploy/<name>    # roll back to the previous version
+kubectl scale deploy/<name> --replicas=5
+kubectl get hpa -w                    # watch autoscaling in real time
+```
+
+A tiny Deployment to keep in your back pocket:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 3
+  selector:
+    matchLabels: { app: web }
+  template:
+    metadata:
+      labels: { app: web }
+    spec:
+      containers:
+        - name: web
+          image: myapp:1.0
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits: { cpu: "500m", memory: "256Mi" }
+```
+
+## Interview signals & common pitfalls
+
+- **Signal of mastery:** you think in terms of *desired state and reconciliation*, reach for a
+  Deployment (not a bare Pod), and can explain how a Service finds its Pods via **labels and
+  selectors**.
+- **Pitfall:** creating naked Pods instead of Deployments — nothing recreates them when a node dies.
+- **Pitfall:** no readiness probe, so a rolling update sends traffic to Pods that aren't ready yet
+  and users see errors mid-deploy.
+- **Pitfall:** omitting resource requests, so the scheduler packs nodes blindly and Pods get
+  OOM-killed or evicted under pressure.
+- **Pitfall:** treating a Secret as encrypted — it's only base64-encoded. Enable encryption at rest
+  and lock down RBAC.
+
+## Mastery checklist
+
+<Checklist id="kubernetes">
+  <Check>I can explain the control plane (API server, etcd, scheduler) versus the nodes and kubelet.</Check>
+  <Check>I know why I use a Deployment instead of creating Pods directly.</Check>
+  <Check>I can pick between ClusterIP, NodePort, LoadBalancer and Ingress for exposing a service.</Check>
+  <Check>I connect Services to Pods with labels and selectors, and inject config via ConfigMaps and Secrets.</Check>
+  <Check>I can write liveness/readiness probes and set resource requests and limits.</Check>
+  <Check>I can perform a zero-downtime rolling update and roll it back with kubectl.</Check>
+  <Check>I can configure an HPA and demonstrate Pods scaling out and back in under load.</Check>
+  <Check>I can deploy an app to a local cluster with a Service, Ingress and PVC from YAML.</Check>
+</Checklist>
+
+<Callout type="info">
+Next up in the roadmap: [Cloud (AWS & Azure)](/docs/platform/cloud) — where these clusters actually
+run, and the managed services (EKS, AKS, load balancers, storage) that host them in production.
+</Callout>

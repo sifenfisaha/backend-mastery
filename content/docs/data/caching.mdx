@@ -1,0 +1,177 @@
+---
+title: Caching
+description: Cache-aside, write-through, TTLs, invalidation, CDNs and stampede protection — speed without stale data.
+icon: Layers
+---
+
+## Why this matters
+
+The fastest query is the one you never run. Caching is how you turn a 200ms database hit into a
+sub-millisecond memory lookup — and it's the single biggest lever you have on both latency and cost
+at scale. But caching is a deal with the devil: every cache you add is a second copy of the truth
+that can drift out of sync. Get it right and your system flies; get it wrong and users see stale
+prices, ghost inventory, and bugs that only appear under load. Every senior backend engineer is
+expected to reach for a cache instinctively *and* know exactly how it can bite them.
+
+<MentorNote>
+Don't confuse a cache *miss* with a cache *bug*. A miss is normal and cheap — you just fall back to
+the source. The real danger is a **stale hit**: fast, confident, and wrong. Caching's job isn't to
+be always fast; it's to be fast *without lying*. Design for invalidation first, speed second.
+</MentorNote>
+
+## Mental model
+
+Think of a cache like the notepad on your desk versus the filing cabinet across the room:
+
+- The **filing cabinet** (your database) is the source of truth — complete, durable, slow to reach.
+- The **notepad** (the cache) holds the few things you keep looking up — instant, but a *copy*.
+- A **TTL** is you crossing out a note after an hour because it might be out of date.
+- **Invalidation** is tearing off the note the moment you file a change — harder than it sounds.
+
+Caching exists at every layer of the stack, and each layer is just another notepad closer to the
+user: the **browser**, a **CDN** at the edge, a **reverse proxy** (NGINX/Varnish), your
+**application** (Redis/Memcached), and even the **database** itself (buffer pool, query cache). The
+closer to the user you cache, the faster it is — and the harder it is to invalidate.
+
+## Core concepts to master
+
+<Accordions type="single">
+<Accordion title="Cache layers: client → CDN → proxy → app → database">
+Every request passes through a stack of potential caches. **Browser cache** (via `Cache-Control`)
+avoids the network entirely. A **CDN** serves static and cacheable responses from an edge near the
+user. A **reverse proxy** caches rendered pages or API responses in front of your app. Your
+**application cache** (Redis) holds computed results and hot rows. Finally the **database** caches
+pages and plans internally. Push caching as close to the user as the data's freshness allows.
+</Accordion>
+<Accordion title="Cache-aside (lazy loading) & read-through">
+**Cache-aside** is the workhorse: on read, check the cache; on a miss, load from the DB, write it
+back, and return it. The application owns the cache logic. **Read-through** hides that behind the
+cache library — you ask the cache, it fetches from the DB for you on a miss. Cache-aside only
+populates data that's actually requested, so cold or rarely-read keys never waste memory.
+</Accordion>
+<Accordion title="Write-through & write-behind">
+**Write-through** writes to the cache *and* the database synchronously on every write — the cache is
+always fresh, but writes are slower. **Write-behind (write-back)** writes to the cache immediately
+and flushes to the DB asynchronously — blazing fast writes, but you risk losing data if the cache
+dies before the flush. Most systems combine cache-aside reads with write-through or explicit
+invalidation on writes.
+</Accordion>
+<Accordion title="TTL & eviction (LRU / LFU)">
+A **TTL** bounds staleness: after it expires, the entry is refetched. **Eviction** decides what to
+drop when memory fills. **LRU** (least recently used) evicts the coldest-by-time entry — a great
+default. **LFU** (least frequently used) keeps the most-hit keys and is better for stable hot sets.
+Pick a TTL from how stale the data may safely be, and size the cache so eviction stays rare.
+</Accordion>
+<Accordion title="The two hard problems: invalidation & naming">
+There are only two hard things in computer science: **cache invalidation** and **naming things**.
+Invalidation means removing or updating a cached value the instant the source changes — miss it and
+you serve stale data forever. Naming means designing **cache keys** that are unique, stable, and
+include every input that changes the result (user id, filters, version). A sloppy key silently
+serves one user's data to another.
+</Accordion>
+<Accordion title="Stampede, thundering herd & stale-while-revalidate">
+When a hot key expires, every concurrent request misses at once and slams the database — a **cache
+stampede** (thundering herd). Mitigate with a **lock** (only one request rebuilds, others wait),
+**request coalescing** (dedupe identical in-flight loads), and **jittered TTLs** so keys don't all
+expire together. **Stale-while-revalidate** serves the expired value immediately while refreshing it
+in the background — users never wait on a rebuild.
+</Accordion>
+</Accordions>
+
+## 📺 Watch
+
+<VideoGrid>
+  <VideoCard id="dGAgxozNWFE" title="Cache Systems Every Developer Should Know" channel="ByteByteGo" duration="6 min" />
+  <VideoCard id="RCdAGvtTYI0" title="The Ultimate Guide to Caching and CDNs" channel="Hayk Simonyan" duration="12 min" />
+  <VideoCard id="V1oGVbxD8mk" title="Distributed Caching Strategies (Cache-Aside/Write-Through/Write-Behind)" channel="System Design" duration="10 min" />
+  <VideoCard href="https://www.youtube.com/c/GauravSensei/playlists" title="System Design playlist (caching)" channel="Gaurav Sen" />
+</VideoGrid>
+
+<MentorNote title="What to actually watch">
+Start with ByteByteGo for the 6-minute lay of the land, then the Distributed Caching Strategies
+video to nail the read/write patterns — that's the interview meat. Use Hayk Simonyan when you get to
+the CDN section of the lab. Save the Gaurav Sen playlist for when you want the deeper system-design
+context; don't binge it before you've built something.
+</MentorNote>
+
+## 📚 Read
+
+<ResourceGrid>
+  <Resource type="doc" title="Cache-Aside Pattern" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside" desc="The canonical write-up of the lazy-loading pattern." />
+  <Resource type="article" title="Caching Best Practices" href="https://learn.microsoft.com/en-us/azure/architecture/best-practices/caching" desc="TTLs, eviction, keys and pitfalls in one place." />
+  <Resource type="doc" title="What Is Caching?" href="https://www.cloudflare.com/learning/cdn/what-is-caching/" desc="Clear primer on caching and how CDNs use it." />
+  <Resource type="lab" title="Redis Cache-Aside Tutorial" href="https://redis.io/tutorials/howtos/solutions/microservices/caching/" desc="Hands-on cache-aside with Redis around a slow query." />
+</ResourceGrid>
+
+## 🔨 Build this
+
+<Steps>
+<Step>
+**Cache-aside around a slow query.** Take an endpoint backed by a deliberately slow query (add a
+`pg_sleep` or a heavy join). Wrap it with Redis: on read, `GET` the key; on a miss, run the query,
+`SET` the result, and return it. Measure the before/after latency — the second request should be
+orders of magnitude faster.
+</Step>
+<Step>
+**Add TTL + invalidation on writes.** Give the key a TTL (say 60s) so it self-heals. Then, on any
+write that changes that data, `DEL` the key so the next read repopulates it. Confirm a write is
+immediately visible on the next read — no stale hit.
+</Step>
+<Step>
+**Simulate a stampede.** Fire 100 concurrent requests at a key right as it expires (drop the TTL and
+hammer it). Watch your database get slammed by a thundering herd of simultaneous misses — every
+request rebuilding the same value at once.
+</Step>
+<Step>
+**Fix the stampede.** Add a per-key rebuild **lock** (only one request recomputes, the rest wait for
+the result) or **request coalescing**, plus a small random **jitter** on the TTL. Re-run the load
+test and confirm the database sees a single rebuild instead of a hundred.
+</Step>
+</Steps>
+
+## Cheat sheet
+
+```bash
+# Cache-aside read (pseudo-flow)
+GET  user:42:profile            # hit? return it
+# miss → SELECT ... FROM users WHERE id=42
+SET  user:42:profile <json> EX 60   # cache with a 60s TTL
+
+# Invalidate on write
+DEL  user:42:profile            # drop stale entry after an update
+
+# Stampede protection: single-flight lock
+SET  lock:user:42 1 NX EX 5     # only one rebuilder wins (NX = set if absent)
+
+CONFIG SET maxmemory-policy allkeys-lru   # LRU eviction under memory pressure
+```
+
+## Interview signals & common pitfalls
+
+- **Signal of mastery:** you reach for cache-aside by default, can explain a stampede and its three
+  fixes (lock, coalescing, jittered TTL) unprompted, and treat invalidation as the hard part.
+- **Pitfall:** no TTL and no invalidation — the cache never notices the source changed and serves
+  stale data forever.
+- **Pitfall:** cache keys that omit an input (user id, locale, filter), so one user's cached
+  response leaks to another.
+- **Pitfall:** every hot key sharing the same TTL, so they all expire together and trigger a
+  synchronized stampede.
+- **Pitfall:** caching write-heavy or rarely-read data — you pay the cost of the cache without ever
+  getting the hit-rate payoff.
+
+## Mastery checklist
+
+<Checklist id="caching">
+  <Check>I can explain the cache layers from browser to CDN to app to database.</Check>
+  <Check>I can implement cache-aside and know when to prefer write-through or write-behind.</Check>
+  <Check>I choose TTLs from acceptable staleness and understand LRU vs LFU eviction.</Check>
+  <Check>I design cache keys that include every input affecting the result.</Check>
+  <Check>I invalidate cached entries on writes instead of relying on TTL alone.</Check>
+  <Check>I can describe a cache stampede and fix it with locks, coalescing, and jittered TTLs.</Check>
+  <Check>I know when stale-while-revalidate is the right tradeoff for a hot key.</Check>
+</Checklist>
+
+<Callout type="info">
+Next up in the roadmap: [System Design](/docs/architecture/system-design) — caching is one of the
+biggest levers there, and now you know how to wield it without serving stale data.
+</Callout>

@@ -1,0 +1,183 @@
+---
+title: Load Balancing
+description: Spread traffic across servers — L4 vs L7, algorithms, health checks and reverse proxies.
+icon: Scale
+---
+
+## Why this matters
+
+One server can only take you so far. The moment you run two copies of your app, you need something
+in front deciding *which* copy gets each request — and that something is a load balancer. It's the
+piece that turns "a box that goes down at 3am" into "a fleet that shrugs off a dead node." Every
+scalable, reliable system you'll design has a load balancer somewhere near the front door: spreading
+traffic, hiding dead backends, terminating TLS, and giving you a place to add or remove capacity
+without your users noticing. Get this right and horizontal scaling, zero-downtime deploys, and
+failover all fall out of it almost for free.
+
+<MentorNote>
+Don't confuse a **load balancer** with a **reverse proxy** with a **forward proxy** — people slur
+them together and it shows in interviews. A forward proxy sits in front of *clients* and speaks to
+the internet on their behalf (think a corporate egress proxy). A reverse proxy sits in front of
+*servers* and represents them to the internet. A load balancer is a reverse proxy whose whole job is
+spreading traffic across several backends. Every load balancer is a reverse proxy; not every reverse
+proxy balances load.
+</MentorNote>
+
+## Mental model
+
+Think of a busy restaurant with a host at the door:
+
+- The **host** is the load balancer — you never talk to the kitchen directly.
+- The **tables** are your backend servers — interchangeable, each can seat you.
+- **Seating strategy** is the algorithm — next free table (round-robin), the least-busy waiter
+  (least-connections), or "regulars always get Maria's section" (sticky sessions / IP hash).
+- The host quietly **checks** which tables are actually clean and staffed (health checks) and stops
+  seating anyone at a table where the waiter walked out (failover).
+
+The diner never learns any of this. They ask for a seat and get one. That opacity is the entire
+point — clients hit one stable address, and you reshuffle the kitchen behind it however you like.
+
+## Core concepts to master
+
+<Accordions type="single">
+<Accordion title="L4 vs L7 balancing">
+**Layer 4** balances on TCP/UDP — it sees IPs and ports, not URLs. It's fast and protocol-agnostic
+(AWS calls this an NLB). **Layer 7** understands HTTP: it can route on path, host header, or cookie,
+do TLS termination, and rewrite requests (AWS calls this an ALB). Rule of thumb: reach for L7 for
+web apps that need smart routing, L4 when you need raw throughput or non-HTTP protocols.
+</Accordion>
+<Accordion title="Algorithms">
+**Round-robin** rotates evenly — great when backends are identical. **Weighted** sends more traffic
+to beefier nodes. **Least-connections** favors the server with the fewest open connections — better
+when request durations vary wildly. **IP hash** pins a client to a backend by hashing its IP (cheap
+stickiness). **Consistent hashing** minimizes reshuffling when you add or remove a node — essential
+for cache fleets so you don't invalidate everything on a scale event.
+</Accordion>
+<Accordion title="Health checks & failover">
+A backend in the pool that's actually broken is worse than no backend. **Active** health checks
+poll each server on an interval (`GET /healthz`); **passive** checks watch live traffic and eject a
+node after N failures. Either way, an unhealthy node is pulled out of rotation and re-added once it
+recovers. This is what makes rolling deploys and node death invisible to users.
+</Accordion>
+<Accordion title="Sticky sessions">
+Some apps store session state in server memory, so a user must keep hitting the *same* backend.
+You can pin them with a cookie or IP hash. It works, but it's a smell — stickiness fights even
+distribution and breaks when that node dies. The senior move is to make backends **stateless** and
+push session state into Redis or a signed token, so any server can serve any request.
+</Accordion>
+<Accordion title="TLS termination">
+The load balancer can decrypt HTTPS at the edge and forward plain HTTP to backends on a trusted
+network. That centralizes certificate management and offloads crypto from your app servers. If the
+internal network isn't trusted, re-encrypt to the backend (TLS passthrough or end-to-end) instead.
+</Accordion>
+<Accordion title="Global vs local balancing">
+**Local** balancing spreads traffic within one region across a pool. **Global** balancing routes
+users to the nearest or healthiest *region* — usually via DNS (return different IPs per location) or
+**anycast** (the same IP announced from many locations, and the network routes to the closest). Real
+systems layer them: anycast/DNS to pick a region, then a local LB to pick a server.
+</Accordion>
+</Accordions>
+
+## 📺 Watch
+
+<VideoGrid>
+  <VideoCard id="K0Ta65OqQkY" title="What is LOAD BALANCING?" channel="Gaurav Sen" duration="12 min" />
+  <VideoCard id="dBmxNsS3BGE" title="Top 6 Load Balancing Algorithms" channel="ByteByteGo" duration="6 min" />
+  <VideoCard id="xo5V9g9joFs" title="Proxy vs Reverse Proxy vs Load Balancer" channel="TechWorld with Nana" duration="13 min" />
+  <VideoCard id="aKMLgFVxZYk" title="Load balancing Layer 4 vs Layer 7 (HAProxy)" channel="Hussein Nasser" duration="38 min" />
+</VideoGrid>
+
+<MentorNote title="What to actually watch">
+Start with Gaurav Sen for the why, then the ByteByteGo algorithms video — those two give you the
+whole mental model in under 20 minutes. Watch Nana's proxy explainer to nail the vocabulary that
+trips people up in interviews. Save Hussein Nasser's L4-vs-L7 deep dive for when you want the packet-
+level detail — skip it on a first pass and do the lab instead.
+</MentorNote>
+
+## 📚 Read
+
+<ResourceGrid>
+  <Resource type="doc" title="NGINX HTTP Load Balancing" href="https://docs.nginx.com/nginx/admin-guide/load-balancer/http-load-balancer/" desc="The official guide to upstreams, algorithms, and health checks." />
+  <Resource type="doc" title="AWS Elastic Load Balancing" href="https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/what-is-load-balancing.html" desc="How cloud LBs (ALB/NLB) work and when to use each." />
+  <Resource type="article" title="Cloudflare: What Is Load Balancing?" href="https://www.cloudflare.com/learning/performance/what-is-load-balancing/" desc="A clean conceptual primer on the core ideas." />
+  <Resource type="lab" title="DigitalOcean: HAProxy & Load Balancing Concepts" href="https://www.digitalocean.com/community/tutorials/an-introduction-to-haproxy-and-load-balancing-concepts" desc="Hands-on intro to HAProxy and the vocabulary." />
+</ResourceGrid>
+
+## 🔨 Build this
+
+<Steps>
+<Step>
+**Run three backends.** Spin up three copies of a tiny HTTP service that each return their own name
+— e.g. `docker run -d -e NAME=app1 ... ` for `app1`, `app2`, `app3`, each on its own port (or use a
+`docker-compose.yml` with three services). Confirm each responds with a distinct identifier so you
+can *see* which one served you.
+</Step>
+<Step>
+**Put NGINX in front.** Write the `upstream` block below, point a `server` at it, and start NGINX.
+Now hit the single front-door port and confirm requests reach the pool. This is round-robin by
+default.
+</Step>
+<Step>
+**Watch the distribution.** Run a curl loop and tally the responses:
+`for i in $(seq 1 30); do curl -s localhost:8080; done | sort | uniq -c`. With round-robin you
+should see a roughly even split across `app1`/`app2`/`app3`.
+</Step>
+<Step>
+**Swap the algorithm.** Add `least_conn;` to the upstream, reload, and re-run the loop. Then try
+`ip_hash;` and notice you now get pinned to one backend. Finally, `docker stop app2` and watch NGINX
+route around the dead node — that's health-check-driven failover in action.
+</Step>
+</Steps>
+
+## Cheat sheet
+
+```nginx
+# nginx.conf — round-robin across three backends
+upstream backend {
+    # least_conn;          # uncomment: send to the least-busy server
+    # ip_hash;             # uncomment: pin each client IP to one backend
+    server app1:8080 weight=1 max_fails=3 fail_timeout=10s;
+    server app2:8080 weight=1;
+    server app3:8080 weight=1 backup;   # only used if the others are down
+}
+
+server {
+    listen 80;
+    location / {
+        proxy_pass http://backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+## Interview signals & common pitfalls
+
+- **Signal of mastery:** you can pick L4 vs L7 for a given problem, name the tradeoff of the
+  algorithm you chose, and explain why you'd make backends stateless rather than reach for sticky
+  sessions.
+- **Pitfall:** relying on sticky sessions to hide in-memory state — one node dies and those users
+  lose their sessions. Externalize state instead.
+- **Pitfall:** no health checks, so the LB keeps sending traffic to a backend that's returning 500s.
+- **Pitfall:** using plain round-robin when request durations vary wildly, then wondering why one
+  node is pinned at 100% CPU. Reach for least-connections.
+- **Pitfall:** treating the load balancer as a single point of failure — the LB itself needs
+  redundancy (a standby, or a managed cloud LB that's HA by design).
+
+## Mastery checklist
+
+<Checklist id="load-balancing">
+  <Check>I can explain the difference between a forward proxy, a reverse proxy, and a load balancer.</Check>
+  <Check>I can choose L4 vs L7 balancing for a given workload and justify it.</Check>
+  <Check>I know when to use round-robin, weighted, least-connections, IP hash, and consistent hashing.</Check>
+  <Check>I can configure an NGINX upstream and switch algorithms.</Check>
+  <Check>I understand active vs passive health checks and how failover removes bad nodes.</Check>
+  <Check>I know why stateless backends beat sticky sessions and how to externalize session state.</Check>
+  <Check>I can explain TLS termination and global vs local balancing (DNS, anycast).</Check>
+</Checklist>
+
+<Callout type="info">
+Next up in the roadmap: [Scalability & Reliability](/docs/architecture/scalability-reliability) — a
+load balancer is the front door, but real resilience comes from how you scale, replicate, and fail
+over the fleet behind it.
+</Callout>

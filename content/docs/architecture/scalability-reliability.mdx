@@ -1,0 +1,190 @@
+---
+title: Scalability, Reliability & Fault Tolerance
+description: Scale horizontally and stay up — redundancy, circuit breakers, retries, backpressure and SLOs.
+icon: TrendingUp
+---
+
+## Why this matters
+
+Anyone can build a service that works when one user hits it on a good day. Senior engineers build
+services that stay up when traffic 10x's, when a downstream dependency gets slow, and when a machine
+quietly dies at 3am. **Scalability** is how you grow to handle more load; **reliability** is how you
+keep working when parts of the system fail — and in a distributed system, something is always
+failing. These are the skills that separate "it runs" from "it runs in production with real money on
+the line." Every pattern here — retries, circuit breakers, backpressure, SLOs — exists because
+someone learned the hard way what happens without it.
+
+<MentorNote>
+Don't confuse scalability with performance. **Performance** is how fast a single request is;
+**scalability** is what happens to that speed as load grows. A blazing-fast service that falls over
+at 100 requests per second is not scalable. And don't confuse *availability* with *reliability*: a
+system can be available (responding) while returning wrong or degraded results. You want both.
+</MentorNote>
+
+## Mental model
+
+Think of a busy restaurant, not a single heroic chef:
+
+- **Vertical scaling** is hiring one superhuman chef with a bigger stove — powerful, simple, but
+  there's a ceiling and if that one chef gets sick, dinner is cancelled.
+- **Horizontal scaling** is hiring more line cooks — cheaper per unit, near-limitless, and if one
+  calls in sick, service continues. This only works if any cook can handle any order (statelessness).
+- **Redundancy** is keeping spare cooks and a backup stove. **N+1** means always having one more than
+  you strictly need, so a failure doesn't drop you below capacity.
+- **A single point of failure** is the one dishwasher everyone depends on — when it breaks, the whole
+  kitchen stops. Find these and eliminate them.
+
+The core insight: reliability comes from designing for failure, not from hoping it won't happen.
+Assume every dependency will be slow, drop, or lie — then decide what your service does anyway.
+
+## Core concepts to master
+
+<Accordions type="single">
+<Accordion title="Vertical vs horizontal scaling & statelessness">
+**Vertical** (scale up) means a bigger machine — more CPU, RAM. Easy, but has a hard ceiling and a
+single point of failure. **Horizontal** (scale out) means more machines behind a load balancer —
+effectively unlimited, and it survives node loss. The catch: horizontal scaling only works if your
+service is **stateless**. Push session state, in-flight data, and sticky context out to a shared
+store (Redis, a database) so any instance can serve any request. Stateless services are the
+foundation everything else in this page depends on.
+</Accordion>
+<Accordion title="Availability math: the nines">
+Availability is uptime expressed in "nines." **99.9%** ("three nines") allows ~8.7 hours of downtime
+a year; **99.99%** allows ~52 minutes; **99.999%** allows ~5 minutes. Two lessons: (1) each extra
+nine costs roughly 10x more effort, so pick a target that matches the business, not vanity. (2)
+Availability of a chain **multiplies** — five dependencies at 99.9% each give you only ~99.5%
+combined. Redundancy fights this: two independent 99% components in parallel give ~99.99%.
+</Accordion>
+<Accordion title="Reliability patterns: timeouts, retries, backoff, circuit breakers">
+The essential toolkit for talking to a flaky dependency. Always set **timeouts** — a request with no
+timeout can hang forever and exhaust your threads. **Retry** transient failures, but with
+**exponential backoff plus jitter** so you don't stampede a recovering service. Cap retries and only
+retry **idempotent** operations. A **circuit breaker** (Fowler's pattern) watches the failure rate
+and, once it trips, fails fast for a cooldown instead of hammering a dead dependency — then probes to
+see if it recovered.
+</Accordion>
+<Accordion title="Bulkheads, backpressure, load shedding & graceful degradation">
+**Bulkheads** isolate resources (separate thread pools or connection pools per dependency) so one
+slow downstream can't drown the whole ship. **Backpressure** signals upstream to slow down when
+you're saturated instead of silently queueing until you OOM. **Load shedding** deliberately rejects
+low-priority work under overload to protect the core. **Graceful degradation** means serving a
+reduced experience (cached data, no recommendations) rather than an error page — the site stays up
+even when a feature is down.
+</Accordion>
+<Accordion title="Idempotency, failover & replication">
+**Idempotency** means doing an operation twice has the same effect as once — essential because
+retries and at-least-once delivery guarantee duplicates. Use idempotency keys for writes like
+payments. **Replication** keeps copies of data (or a service) so a failure doesn't lose it;
+**failover** is the automatic switch to a healthy replica when the primary dies. Understand the
+tradeoffs: synchronous replication is safe but slow, asynchronous is fast but can lose recent writes.
+</Accordion>
+<Accordion title="SLIs, SLOs, SLAs & error budgets">
+An **SLI** is a measured indicator (e.g. p99 latency, success rate). An **SLO** is your internal
+target for that SLI (e.g. 99.9% of requests under 300ms). An **SLA** is the contractual promise to
+customers, usually looser than the SLO, with penalties. The magic is the **error budget**: if your
+SLO is 99.9%, you have 0.1% "budget" to spend on risk. Budget left? Ship features. Budget blown?
+Freeze and fix reliability. This is how Google's SRE practice turns reliability into a number teams
+can reason about.
+</Accordion>
+</Accordions>
+
+## 📺 Watch
+
+<VideoGrid>
+  <VideoCard id="POxWEygUmR4" title="Scale Your Backend Like a Pro (H/V Scaling)" channel="ByteByteGo" duration="12 min" />
+  <VideoCard id="xpDnVSmNFX0" title="Horizontal vs Vertical Scaling" channel="Gaurav Sen" duration="10 min" />
+  <VideoCard id="DNam6NbjgW4" title="Fault Tolerance | System Design" channel="Tech Dummies Narendra L" duration="15 min" />
+  <VideoCard id="d2wn_E1jxn4" title="SRE at Google (GOTO 2018)" channel="GOTO Conferences" duration="45 min" />
+</VideoGrid>
+
+<MentorNote title="What to actually watch">
+Start with Gaurav Sen's scaling video for the crisp vertical-vs-horizontal mental model, then
+ByteByteGo to see it applied to a real backend. Watch the Fault Tolerance video for the patterns
+vocabulary. Save the Google SRE talk for last — it ties SLOs and error budgets to how real teams
+operate, and it'll mean more once the earlier ideas have landed. Don't binge all four; the lab below
+teaches more than a fourth passive video.
+</MentorNote>
+
+## 📚 Read
+
+<ResourceGrid>
+  <Resource type="book" title="Google SRE Book" href="https://sre.google/sre-book/table-of-contents/" desc="The definitive free text on SLOs, error budgets, and running reliable systems." />
+  <Resource type="article" title="CircuitBreaker — Martin Fowler" href="https://martinfowler.com/bliki/CircuitBreaker.html" desc="The canonical explanation of the circuit breaker pattern." />
+  <Resource type="doc" title="AWS Well-Architected: Reliability Pillar" href="https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/welcome.html" desc="Practical, vendor-grounded guidance on designing for failure." />
+  <Resource type="lab" title="Resilient Service Lab (LB + cache + circuit breaker + retries)" href="https://learn.microsoft.com/en-us/azure/well-architected/reliability/" desc="Azure's reliability guidance — a checklist to shape the build-this lab below." />
+</ResourceGrid>
+
+## 🔨 Build this
+
+<Steps>
+<Step>
+**Stand up a flaky dependency.** Write a tiny "downstream" service with a `/data` endpoint that
+randomly fails (500s) 30% of the time and randomly adds a 2–5s delay. This is your unreliable world.
+Put a second "frontend" service in front of it that just calls `/data` and returns the result — no
+protection yet. Load-test it and watch failures and latency spikes pass straight through.
+</Step>
+<Step>
+**Add timeouts, retries with backoff, and a cache.** Give the frontend a request **timeout** (say
+1s). Retry transient failures with **exponential backoff plus jitter**, capped at 3 attempts. Add a
+short-lived **cache** so repeated reads survive a downstream blip. Re-run the load test — success
+rate should climb and tail latency should tighten.
+</Step>
+<Step>
+**Wrap it in a circuit breaker and load-balance.** Add a **circuit breaker** around the downstream
+call so that when failures cross a threshold, the frontend fails fast (or serves cached/degraded
+data) instead of piling on. Run two or three instances of the downstream behind a **load balancer**
+so a single dead instance is routed around.
+</Step>
+<Step>
+**Inject failures and measure.** Deliberately kill one downstream instance, then crank the failure
+rate to 100% and confirm the breaker trips and your frontend degrades gracefully instead of falling
+over. Define an **SLO** (e.g. 99% success, p99 under 500ms), measure your SLIs during the chaos, and
+write down how much error budget the experiment burned.
+</Step>
+</Steps>
+
+## Cheat sheet
+
+```text
+Scaling        vertical = bigger box (ceiling + SPOF); horizontal = more boxes (needs stateless)
+Availability   99.9% ≈ 8.7h/yr down · 99.99% ≈ 52m · 99.999% ≈ 5m · chained nines multiply
+Timeout        every network call gets one — no unbounded waits
+Retry          only idempotent ops · exponential backoff + jitter · cap attempts
+Circuit break  trip on failure rate → fail fast for a cooldown → probe to recover
+Bulkhead       isolate pools so one slow dep can't sink the whole service
+Backpressure   signal upstream to slow down instead of queueing to OOM
+Load shed      drop low-priority work under overload to protect the core
+SLI/SLO/SLA    measured / internal target / customer contract · error budget = 1 - SLO
+```
+
+## Interview signals & common pitfalls
+
+- **Signal of mastery:** you reach for "make it stateless and scale horizontally" instinctively, and
+  you can walk through what happens to a request when a dependency goes slow — timeout, retry with
+  backoff, circuit breaker, degrade — without being prompted.
+- **Pitfall:** retrying without backoff or jitter, turning a small blip into a **retry storm** that
+  keeps the recovering dependency down.
+- **Pitfall:** retrying non-idempotent operations, so a "failed" payment actually charged twice.
+- **Pitfall:** no timeouts — one hung downstream call exhausts your thread pool and takes the whole
+  service with it.
+- **Pitfall:** chasing five nines everywhere. Each nine costs ~10x; pick SLOs that match the business
+  and spend the error budget on shipping.
+
+## Mastery checklist
+
+<Checklist id="scalability-reliability">
+  <Check>I can explain vertical vs horizontal scaling and why statelessness enables scale-out.</Check>
+  <Check>I can do availability math with nines and know that chained dependencies multiply.</Check>
+  <Check>I always set timeouts and retry only idempotent ops with exponential backoff plus jitter.</Check>
+  <Check>I can describe when and how a circuit breaker trips, cools down, and recovers.</Check>
+  <Check>I understand bulkheads, backpressure, load shedding, and graceful degradation.</Check>
+  <Check>I can design idempotent operations and explain replication vs failover tradeoffs.</Check>
+  <Check>I can define SLIs, SLOs, SLAs and use an error budget to decide ship vs freeze.</Check>
+  <Check>I've built a resilient service in front of a flaky dependency and injected failures to prove it.</Check>
+</Checklist>
+
+<Callout type="info">
+Next up in the roadmap: [Queues & Event-Driven Architecture](/docs/messaging/queues-eda) — decoupling
+services with queues is one of the most powerful ways to absorb load spikes, add backpressure, and
+keep the system reliable when a consumer falls behind.
+</Callout>

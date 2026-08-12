@@ -1,0 +1,186 @@
+---
+title: Linux & Networking
+description: Live in the shell and understand the full path of a request — processes, permissions, TCP/IP, DNS and TLS.
+icon: Network
+---
+
+## Why this matters
+
+Every backend you'll ever run lives on Linux and talks over a network. When a request is slow, a
+port won't bind, a cert expired at 2am, or a process is eating all the memory, nobody hands you a
+GUI — you get an SSH prompt and a blinking cursor. The engineers who stay calm in that moment are
+the ones who understand what actually happens between "user types a URL" and "bytes come back." This
+topic is the ground floor of the whole program: containers, load balancers, Kafka, and Kubernetes
+are all just processes on Linux hosts moving packets around. Get fluent here and everything above it
+gets easier.
+
+<MentorNote>
+Don't confuse a *hostname* with an *address*, or a *port* with a *process*. DNS turns a name like
+`api.example.com` into an IP address. A port (like `443`) is just a number a process listens on so
+the kernel knows which process gets the packet. One machine, one IP, thousands of ports — and a
+request only completes when name resolution, the TCP handshake, the TLS handshake, and the HTTP
+exchange *all* succeed. Most "the site is down" incidents are really one of those four steps
+failing.
+</MentorNote>
+
+## Mental model
+
+Think of sending a request like mailing a physical letter:
+
+- **DNS** is the address book — it looks up where `api.example.com` actually lives (an IP).
+- **IP** is the street address; **the port** is the apartment number for a specific process.
+- **TCP** is registered mail with delivery confirmation — ordered, reliable, retried. **UDP** is
+  dropping a postcard in the box — fast, no guarantees.
+- **TLS** is sealing the envelope so only the recipient can read it, and checking the sender's ID.
+- **HTTP** is the language written *inside* the letter once it's delivered.
+
+And the Linux side of the model: **everything is a file** (devices, sockets, pipes), **everything is
+a process** (with an owner, permissions, and a parent), and **small tools piped together** beat one
+giant tool. Once you see the shell as composable Lego rather than magic incantations, you stop
+memorizing and start reasoning.
+
+## Core concepts to master
+
+<Accordions type="single">
+<Accordion title="Files, permissions & the filesystem">
+Everything is a path. Learn `ls -la`, `cd`, `cp`, `mv`, `rm`, `find`, and `chmod`/`chown`.
+Permissions are three triplets — owner, group, other — each with read (4), write (2), execute (1),
+so `chmod 755` means `rwxr-xr-x`. Understand the difference between a file's owner and the user a
+process runs as, because that mismatch is behind most "permission denied" surprises on a server.
+</Accordion>
+<Accordion title="Processes, signals & resources">
+A process has a PID, a parent, an owner, and open file descriptors. Inspect with `ps aux`, `top`/`htop`,
+and `/proc`. Send signals with `kill` (SIGTERM to ask nicely, SIGKILL to force). Know how to find
+what's eating CPU or memory, and how a container's "one process" (PID 1) differs from a full host.
+Background jobs, `&`, and `nohup` matter when you're running things over SSH.
+</Accordion>
+<Accordion title="Pipes, redirection & text tools">
+The Unix superpower: `stdin`, `stdout`, `stderr`, and gluing commands with `|`. Redirect with `>`,
+`>>`, and `2>&1`. Master `grep`, `sort`, `uniq`, `wc`, `cut`, `awk`, and `sed` — together they let
+you slice logs and API output without writing a script. `grep "500" access.log | wc -l` answers a
+production question in one line.
+</Accordion>
+<Accordion title="systemd & journald">
+On modern Linux, `systemd` starts, restarts, and supervises long-running services. Learn
+`systemctl start|stop|status|enable` for a unit, and read its logs with `journalctl -u <service> -f`.
+Understanding units and their restart policies is how you keep a service alive and diagnose why it
+keeps dying — the same instincts you'll reuse for container restart loops.
+</Accordion>
+<Accordion title="The OSI / TCP-IP model & TCP vs UDP">
+The layered model (physical → link → network → transport → application) is a map for *where* a
+problem lives. Most of your work is layers 3–7: IP addressing, TCP/UDP at transport, and HTTP/TLS at
+the top. TCP gives you ordered, reliable, connection-oriented delivery via a three-way handshake;
+UDP is connectionless and lossy but fast — the right choice for DNS, video, and metrics. Knowing
+which you're on tells you what can and can't go wrong.
+</Accordion>
+<Accordion title="DNS, TLS, ports & the tools to inspect them">
+DNS resolves names to IPs (A/AAAA, CNAME, MX records) with caching and TTLs at every hop. TLS
+encrypts the connection and proves server identity via certificates that *expire* — a huge source
+of outages. Ports below 1024 are privileged. The toolkit you'll reach for constantly: `dig` (DNS),
+`ss`/`netstat` (who's listening), `curl` (make and inspect HTTP requests), `openssl s_client` (check
+certs), and `tcpdump` (see actual packets).
+</Accordion>
+</Accordions>
+
+## 📺 Watch
+
+<VideoGrid>
+  <VideoCard id="ROjZy1WbCIA" title="Linux Crash Course for Beginners" channel="freeCodeCamp" duration="2 hr" />
+  <VideoCard id="JKYPZb8D9hY" title="What is the OSI Model?" channel="PowerCert Animated Videos" duration="7 min" />
+  <VideoCard id="qqRYkcta6IE" title="TCP vs UDP Crash Course" channel="Hussein Nasser" duration="41 min" />
+  <VideoCard id="sWbUDq4S6Y8" title="Introduction to Linux – Full Course for Beginners" channel="freeCodeCamp" duration="6 hr" />
+</VideoGrid>
+
+<MentorNote title="What to actually watch">
+Start with the PowerCert OSI video for the 7-minute mental map, then Hussein Nasser on TCP vs UDP —
+that's the networking core. For the shell, do the freeCodeCamp Crash Course and *type along*; the
+6-hour full course is a reference to dip into, not a binge. Skip anything you already know cold — the
+lab below will teach you more than a fourth video.
+</MentorNote>
+
+## 📚 Read
+
+<ResourceGrid>
+  <Resource type="book" title="The Linux Command Line" href="https://linuxcommand.org/tlcl.php" desc="A free, complete book that takes you from lost to fluent in the shell." />
+  <Resource type="article" title="Networking Terminology, Interfaces & Protocols" href="https://www.digitalocean.com/community/tutorials/an-introduction-to-networking-terminology-interfaces-and-protocols" desc="DigitalOcean's plain-English map of the vocabulary you keep hearing." />
+  <Resource type="doc" title="Beej's Guide to Network Programming" href="https://beej.us/guide/bgnet/" desc="The classic guide to sockets — how connections actually work under the hood." />
+  <Resource type="lab" title="Linux Journey (LabEx)" href="https://labex.io/linuxjourney" desc="Interactive, bite-sized lessons to practice the shell in-browser." />
+</ResourceGrid>
+
+## 🔨 Build this
+
+<Steps>
+<Step>
+**Live in the shell for a week.** Navigate a real project with only the terminal: `find` files, `grep`
+logs, watch a process with `htop`, and chain three tools with pipes. Write one line that counts how
+many `500` responses are in a log: `grep " 500 " access.log | wc -l`. No GUI file manager allowed.
+</Step>
+<Step>
+**Inspect a live service.** Pick any server you run (or start a local one). Use `ss -tlnp` to see
+what's listening on which ports, `curl -v https://example.com` to watch the full request/response,
+and `dig example.com` to resolve its name. Explain out loud what each line means.
+</Step>
+<Step>
+**Write a request-trace script.** Build a bash script `trace.sh <host>` that, for a given host,
+(1) resolves DNS with `dig +short`, (2) tests a TCP connect to port 443, (3) checks the TLS
+certificate expiry date, and (4) reports the HTTP status code — all with clear pass/fail output. See
+the cheat sheet for the exact commands.
+</Step>
+<Step>
+**Break it and watch the packets.** Point your script at a host that's down, a name that doesn't
+resolve, and a site with an expired cert — confirm each failure surfaces cleanly. Then run
+`sudo tcpdump -n port 443` while you curl a site and *see* the TCP + TLS handshake happen on the wire.
+</Step>
+</Steps>
+
+## Cheat sheet
+
+```bash
+# --- shell & processes ---
+ls -la                      # long listing with permissions & owners
+grep -R "TODO" .            # recursive search
+ps aux | grep node          # find a process
+kill -TERM <pid>            # ask a process to stop (SIGKILL = -9)
+journalctl -u myapp -f      # follow a systemd service's logs
+
+# --- networking ---
+dig +short api.example.com                              # resolve a name to an IP
+ss -tlnp                                                # who is listening on which ports
+curl -sS -o /dev/null -w "%{http_code}\n" https://x.com # just the HTTP status
+nc -zv api.example.com 443                              # test a TCP connect to a port
+echo | openssl s_client -connect x.com:443 2>/dev/null \
+  | openssl x509 -noout -enddate                        # TLS cert expiry date
+sudo tcpdump -n port 443                                # watch packets on the wire
+```
+
+## Interview signals & common pitfalls
+
+- **Signal of mastery:** asked "what happens when you type a URL and hit enter," you can walk the
+  full path — DNS resolution, TCP handshake, TLS handshake, HTTP request/response — and name the
+  tool you'd use to inspect each step when it breaks.
+- **Pitfall:** confusing "the server is down" with "DNS didn't resolve" or "the cert expired." Always
+  isolate *which* layer failed before touching the app.
+- **Pitfall:** running everything as root because `chmod 777` "just makes it work." That's a security
+  hole and it hides real permission bugs.
+- **Pitfall:** ignoring `stderr`. If a script "produces no output," you're probably only capturing
+  `stdout` — redirect with `2>&1` to see the errors.
+- **Pitfall:** assuming TCP vs UDP doesn't matter. Using TCP where UDP fits (or vice versa) shows up
+  as latency or lost data under load.
+
+## Mastery checklist
+
+<Checklist id="linux-networking">
+  <Check>I can navigate, search, and edit files entirely from the shell.</Check>
+  <Check>I understand Linux permissions and the difference between a file's owner and a process's user.</Check>
+  <Check>I can find and kill a runaway process and read a service's logs with journalctl.</Check>
+  <Check>I can chain commands with pipes to slice logs and API output in one line.</Check>
+  <Check>I can explain the OSI/TCP-IP layers and when to use TCP versus UDP.</Check>
+  <Check>I can trace a request through DNS, TCP, TLS, and HTTP and name the tool to inspect each.</Check>
+  <Check>I can use dig, ss, curl, and tcpdump to diagnose a networking problem.</Check>
+  <Check>I wrote a script that resolves DNS, tests a connection, and checks a cert's expiry.</Check>
+</Checklist>
+
+<Callout type="info">
+Next up in the roadmap: [Docker](/docs/foundations/docker) — now that you understand processes,
+ports, and networks on a Linux host, you're ready to package them into portable containers.
+</Callout>
