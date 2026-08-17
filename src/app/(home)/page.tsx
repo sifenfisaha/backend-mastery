@@ -118,11 +118,7 @@ export default function HomePage() {
         <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 grid-texture" />
         <div className="mx-auto w-full max-w-6xl px-4 py-20 sm:px-6 sm:py-28">
           <div className="mx-auto max-w-3xl text-center">
-            <span className="inline-flex items-center gap-2 rounded-full border border-fd-border bg-fd-card px-3 py-1 font-mono text-[11px] uppercase tracking-widest text-fd-muted-foreground">
-              {WEEK_COUNT} weeks · self-paced · build every week
-            </span>
-
-            <h1 className="mt-6 text-balance text-4xl font-semibold tracking-tight sm:text-5xl md:text-6xl">
+            <h1 className="text-balance text-4xl font-semibold tracking-tight sm:text-5xl md:text-6xl">
               From mid-level to senior backend engineer in 90 days.
             </h1>
 
