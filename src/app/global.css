@@ -10,3 +10,55 @@ html > body[data-scroll-locked] {
   margin-right: 0px !important;
   --removed-body-scroll-bar-size: 0px !important;
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Landing page surface                                                       */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * Structural grid texture, used instead of a decorative glow. Static, purely
+ * behind content, and faded out with a mask so it never competes with text.
+ */
+.grid-texture {
+  background-image:
+    linear-gradient(to right, var(--color-fd-border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-fd-border) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 5%, transparent 75%);
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 5%, transparent 75%);
+}
+
+/*
+ * Hover lift is gated to real pointers so touch devices never get a stuck
+ * hover state after a tap.
+ */
+@media (hover: hover) and (pointer: fine) {
+  .hover-lift {
+    transition:
+      transform 160ms ease-out,
+      border-color 160ms ease-out;
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-2px);
+  }
+}
+
+/*
+ * These rules sit outside any cascade layer, so they win over Tailwind's
+ * layered utilities without needing `!important`. Durations collapse to a
+ * near-zero value rather than 0 so transition/animation events still fire.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .landing *,
+  .landing *::before,
+  .landing *::after {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    transition-duration: 0.01ms;
+  }
+
+  .hover-lift:hover {
+    transform: none;
+  }
+}
