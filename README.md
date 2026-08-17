@@ -1,6 +1,5 @@
 # Backend Mastery — a 3-month path from mid-level to senior
 
-
 A documentation-style learning platform (Next.js + [Fumadocs](https://fumadocs.dev)) that teaches the
 17 systems every senior backend engineer is expected to know: distributed systems, microservices,
 system design, Kubernetes, Docker, AWS/Azure, CI/CD, Linux & networking, PostgreSQL, Redis,
