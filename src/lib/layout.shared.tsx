@@ -1,5 +1,4 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
-import { Boxes } from 'lucide-react';
 import { appName } from './shared';
 
 export function baseOptions(): BaseLayoutProps {
@@ -7,7 +6,17 @@ export function baseOptions(): BaseLayoutProps {
     nav: {
       title: (
         <>
-          <Boxes className="h-5 w-5 text-fd-primary" />
+          {/*
+            Monogram tile rather than an icon: same anatomy as the pillar
+            tiles on the landing page, so the nav reads as part of the same
+            system. Decorative — the wordmark beside it carries the name.
+          */}
+          <span
+            aria-hidden
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-fd-border bg-fd-card font-mono text-[10px] font-medium leading-none tracking-tight text-fd-foreground"
+          >
+            BM
+          </span>
           <span className="font-semibold">{appName}</span>
         </>
       ),
